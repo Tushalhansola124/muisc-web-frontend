@@ -1,6 +1,5 @@
-// app/dashboard/playlists/playlists-edit/[id]/page.tsx
 
-import PlaylistForm from '@/components/playlist-module/paylist-create'
+import PlaylistFormEdit from '@/components/playlist-module/paylist-edit';
 
 export default async function EditPlaylistPage({ 
   params 
@@ -11,9 +10,10 @@ export default async function EditPlaylistPage({
 
   return (
     <div className="p-4">
-      <PlaylistForm 
+      <PlaylistFormEdit
+
         playlistId={id} 
-        isEdit={true} 
+  
       />
     </div>
   )

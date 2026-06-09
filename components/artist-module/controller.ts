@@ -13,6 +13,8 @@ import { cookies } from "next/headers";
 // ======================================================
 
 export interface IArtist {
+  songs: never[];
+  artist: any;
   _id: string
   name: string
   bio: string

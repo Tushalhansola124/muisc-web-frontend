@@ -8,12 +8,12 @@ export const CreatePlaylistSchema = z.object({
 
   description: z
     .string()
-    .max(500, "Description cannot exceed 500 characters")
-    .optional()
-    .default(""),
+    .max(500, "Description cannot exceed 500 characters"),
 
   songs: z
+
     .array(z.string())
     .min(1, "Please select at least one song"),
 });
+
 export type CreatePlaylistFormData = z.infer<typeof CreatePlaylistSchema>;
