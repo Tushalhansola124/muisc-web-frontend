@@ -36,7 +36,11 @@ export const API_ENDPOINTS = {
     add:"/api/song/songCreate",
     update:"/api/song/updateSong/",
     delete:"/api/song/deleteSong/",
-    getById:"/api/song/getByIdSong/"
+    getById:"/api/song/getByIdSong/",
+    likeSong: "/api/likeSong/like/",
+    unlikeSong:"/api/likeSong/unlike/",
+    isLikeSong:"/api/likeSong/is-liked/"
+
   },
   playlist:{
     get:"/api/playlist/getall",

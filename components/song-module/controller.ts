@@ -30,13 +30,14 @@ export interface ISong {
   _id: string
   title: string
   description: string
-  artist: Artist | string
-  album: Album | string
+  artist: Artist
+  album: Album 
   genre: Genre[]
   duration: number
   audioUrl: string
   audioPublicId?: string
   thumbnail: string
+  isLikedByCurrentUser?: boolean
   thumbnailPublicId?: string
   plays: number
   likes: number
@@ -76,18 +77,13 @@ const axiosInstance = axios.create({
 // ======================================================
 
 export const GetSongs = async (
-  token: string
 ): Promise<ISongsResponse> => {
 
   try {
 
     const response = await axiosInstance.get(
       API_ENDPOINTS.song.get,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+  
     )
 
     return response.data
@@ -145,7 +141,7 @@ export const CreateSong = async (
 
 export const GetSongById = async (
   id: string,
-  token: string
+
 ): Promise<ISingleSongResponse> => {
 
   try {
@@ -153,9 +149,7 @@ export const GetSongById = async (
     const response = await axiosInstance.get(
       `${API_ENDPOINTS.song.getById}${id}`,
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+  
       }
     )
     // console.log("GET SONG BY ID RESPONSE:", response.data)

@@ -110,24 +110,52 @@ export const GetPlaylists = async () => {
 // CREATE PLAYLIST
 // ======================================================
 
+// export const CreatePlaylist = async (
+// playlistId: string, songId: string, data: CreatePlaylistPayload) => {
+//   try {
+//     const headers = await getAuthHeaders();
+
+//     const response = await axiosInstance.post(
+//       API_ENDPOINTS.playlist.add,
+//       data,
+//       {
+//         headers,
+//       }
+//     );
+
+//     return response.data;
+//   } catch (error: any) {
+//     console.log("CREATE PLAYLIST ERROR:", error);
+
+//     throw new Error(
+//       error?.response?.data?.message ||
+//       error?.message ||
+//       "Create Playlist Failed"
+//     );
+//   }
+// };
+
 export const CreatePlaylist = async (
+  playlistId: string, 
+  songId: string, 
   data: CreatePlaylistPayload
 ) => {
   try {
     const headers = await getAuthHeaders();
 
     const response = await axiosInstance.post(
-      API_ENDPOINTS.playlist.add,
-      data,
+      API_ENDPOINTS.playlist.add,       
       {
-        headers,
-      }
+        playlistId,
+        songId,
+        ...data
+      },
+      { headers }
     );
 
     return response.data;
   } catch (error: any) {
     console.log("CREATE PLAYLIST ERROR:", error);
-
     throw new Error(
       error?.response?.data?.message ||
       error?.message ||
@@ -205,8 +233,7 @@ export const UpdatePlaylist = async (
 // ======================================================
 
 export const DeletePlaylist = async (
-  id: string
-) => {
+id: string, songId: string) => {
   try {
     const headers = await getAuthHeaders();
 
@@ -228,3 +255,39 @@ export const DeletePlaylist = async (
     );
   }
 };
+
+// Add this new function
+// ======================================================
+// ADD SONG TO PLAYLIST
+// ======================================================
+
+export const AddSongToPlaylist = async (playlistId: string, songId: string) => {
+  try {
+    const headers = await getAuthHeaders();
+ const response = await axiosInstance.post(
+      API_ENDPOINTS.playlist.add,       
+      {
+        playlistId,
+        songId,
+        
+      },
+      { headers }
+    );
+
+    console.log("ADD SONG TO PLAYLIST SUCCESS:", response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error("ADD SONG TO PLAYLIST ERROR:", {
+      status: error?.response?.status,
+      data: error?.response?.data,
+      message: error?.message
+    });
+
+    throw new Error(
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to add song to playlist"
+    );
+  }
+};
+

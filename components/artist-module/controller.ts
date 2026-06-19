@@ -90,14 +90,12 @@ const getAuthHeaders = async () => {
 export const GetArtists = async () => {
   try {
 
-    const headers =
-      await getAuthHeaders();
+    // const headers =
+    //   await getAuthHeaders();
 
     const response = await axios.get(
       `${SERVER_URL}${API_ENDPOINTS.artist.get}`,
-      {
-        headers,
-      }
+  
     );
 
     return response.data;
@@ -165,13 +163,13 @@ export const GetArtistById = async (
   id: string
 ): Promise<ISingleArtistResponse> => {
   try {
-    const headers = await getAuthHeaders();
+    // const headers = await getAuthHeaders();
 
 
 
     const response = await axiosInstance.get(
       `${API_ENDPOINTS.artist.getById}${id}`,
-      { headers }
+     
     );
 
     console.log("✅ Artist Data Received:", response.data);

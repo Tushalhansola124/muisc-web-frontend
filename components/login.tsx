@@ -2,26 +2,24 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, LoginSchemaType } from "@/schemas/login";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useEffect } from "react";
 
- function LoginForm({
+function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-
   const router = useRouter();
+
+  const { data: session, status } = useSession();
 
   const {
     register,
@@ -31,49 +29,37 @@ import Link from "next/link";
     resolver: zodResolver(loginSchema),
   });
 
- async function onSubmit(
-  data: LoginSchemaType
-) {
+  async function onSubmit(data: LoginSchemaType) {
+    try {
+      const response = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
 
-  try {
-
-  const response = await signIn(
-  "credentials",
-  {
-    email: data.email,
-    password: data.password,
-    redirect: false,
+      if (response?.ok && !response?.error) {
+        toast.success("Login successful!");
+      } else {
+        toast.error("Invalid email or password");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong");
+    }
   }
-);
 
-console.log("SignIn Response:", response);
+  useEffect(() => {
+    if (status === "authenticated") {
+      const role = session?.user?.role;
 
-if (response?.ok && !response?.error) {
+      if (role === "admin" || role === "artist") {
+        router.push("/dashboard");
+      } else {
+        router.push("/");
+      }
+    }
+  }, [session, status, router]);
 
-  toast.success(
-    "Login successful!"
-  );
-
-  router.push("/dashboard");
-  router.refresh();
-
-} else {
-
-  toast.error(
-    "Invalid email or password"
-  );
-
-}
-
-  } catch (error) {
-
-    console.error(error);
-
-    toast.error(
-      "Something went wrong"
-    );
-  }
-}
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
@@ -93,7 +79,11 @@ if (response?.ok && !response?.error) {
             placeholder="m@example.com"
             {...register("email")}
           />
-          {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
+          {errors.email && (
+            <p className="text-sm text-red-500">
+              {errors.email.message}
+            </p>
+          )}
         </Field>
 
         <Field>
@@ -103,7 +93,11 @@ if (response?.ok && !response?.error) {
             type="password"
             {...register("password")}
           />
-          {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
+          {errors.password && (
+            <p className="text-sm text-red-500">
+              {errors.password.message}
+            </p>
+          )}
         </Field>
 
         <Field>
@@ -119,7 +113,10 @@ if (response?.ok && !response?.error) {
         <div className="flex justify-center text-sm">
           <FieldLabel>
             Don't have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link
+              href="/register"
+              className="text-primary hover:underline"
+            >
               Sign up
             </Link>
           </FieldLabel>
@@ -128,4 +125,5 @@ if (response?.ok && !response?.error) {
     </form>
   );
 }
-export default LoginForm; 
+
+export default LoginForm;

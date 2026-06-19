@@ -26,8 +26,8 @@ import {
   SearchIcon,
   BarChart3Icon,
   BellIcon,
-  MusicIcon,
   GalleryVerticalEndIcon,
+  Music,
 } from "lucide-react"
 import { TeamSwitcher } from "./team-switcher"
 
@@ -73,11 +73,13 @@ const data = {
       url: "/dashboard/albums",
       icon: <Disc3Icon className="h-5 w-5" />,
     },
+    
     {
       title: "Songs",
       url: "/dashboard/songs",
       icon: <ListMusicIcon className="h-5 w-5" />,
     },
+
     {
       title: "Playlists",
       url: "/dashboard/playlists",
@@ -89,9 +91,9 @@ const data = {
       icon: <ClockIcon className="h-5 w-5" />,
     },
     {
-      title: "Likes",
-      url: "/likes",
-      icon: <HeartIcon className="h-5 w-5" />,
+      title: "Trending Songs",
+      url: "/trending",
+      icon: <Music className="h-5 w-5" />,
     },
     {
       title: "Search",

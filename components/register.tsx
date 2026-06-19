@@ -23,11 +23,8 @@ import {
   RegisterSchemaType,
 } from "@/schemas/register";
 
-import { signIn } from "next-auth/react";
-
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import Link from "next/link";
 import { Register } from "@/app/register/controller";
 
 export function RegisterPage({
@@ -58,13 +55,16 @@ const {
 
     const res = await Register(payload);
 
-    console.log("REGISTER RESPONSE:", res);
 
-    toast.success(
-      res.message || "Registration successful!"
-    );
-
-    router.push("/login");
+    if (res.status === 201) {
+      toast.success("Registration successful! Please login.");
+      router.push("/login");
+    }
+    else{
+      toast.error(
+        res.message || "Registration failed!"
+      );
+    }
 
   } catch (error: any) {
 
