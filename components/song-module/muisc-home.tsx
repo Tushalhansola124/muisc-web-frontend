@@ -7,10 +7,11 @@ import {
   DeletePlaylist,
   CreatePlaylistPayload,
   AddSongToPlaylist,
+  RemoveSongFromPlaylist,
 } from "@/components/playlist-module/controller";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import React, { useRef, useState, useEffect, useCallback, useId } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
 // ─── Types ───────────────────────────────────────────────────
@@ -56,7 +57,6 @@ function getPlaylistSongs(playlistSongs: PlaylistSong[], allSongs: ISong[]): ISo
   return result;
 }
 
-/** Returns true if songId is already in the playlist's songs array */
 function isSongInPlaylist(playlist: IPlaylist, songId: string): boolean {
   return (playlist.songs ?? []).some((s) => getSongId(s as PlaylistSong) === songId);
 }
@@ -87,9 +87,9 @@ export default function MusicHomePage({ songs }: Props) {
   const [playlistsLoading, setPlaylistsLoading] = useState(true);
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
 
-  // ── Song context menu (right-click / ⋮ button) ────────────
+  // ── Song context menu ─────────────────────────────────────
   const [songMenu, setSongMenu] = useState<SongMenuState | null>(null);
-  const [menuLoadingId, setMenuLoadingId] = useState<string | null>(null); // which playlist action is in-flight
+  const [menuLoadingId, setMenuLoadingId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // ── Create playlist modal ─────────────────────────────────
@@ -220,13 +220,13 @@ export default function MusicHomePage({ songs }: Props) {
   };
   const toggleLike = (id: string) =>
     setLiked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+  const formatTime = (sec: number) =>
+    `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
   // ── Song context menu ─────────────────────────────────────
   const openSongMenu = (e: React.MouseEvent, songId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    // Smart position: keep menu within viewport
     const MENU_W = 220;
     const MENU_H = Math.min(playlists.length * 44 + 80, 320);
     let x = e.clientX;
@@ -236,31 +236,28 @@ export default function MusicHomePage({ songs }: Props) {
     setSongMenu({ songId, x, y });
   };
 
-/** Add or remove a song from a playlist */
-const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyIn: boolean) => {
-  const key = `${playlistId}-${songId}`;
-  setMenuLoadingId(key);
-
-  try {
-    if (alreadyIn) {
-      // Remove song
-      await DeletePlaylist(playlistId, songId);        // Assuming this exists and works
-      toast.success("Song removed from playlist");
-    } else {
-      // ADD song - Use the correct API
-      await AddSongToPlaylist(playlistId, songId);     // ← New function
-      toast.success("Song added to playlist");
+  // ── Add / Remove song from playlist ──────────────────────
+  const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyIn: boolean) => {
+    const key = `${playlistId}-${songId}`;
+    setMenuLoadingId(key);
+    try {
+      if (alreadyIn) {
+        await RemoveSongFromPlaylist(playlistId, songId, session?.user?.token || "");
+        toast.success("Song removed from playlist");
+      } else {
+        await AddSongToPlaylist(playlistId, songId, session?.user?.token || "");
+        toast.success("Song added to playlist");
+      }
+      await loadPlaylists();
+    } catch (err: any) {
+      console.error("Playlist update failed:", err);
+      toast.error(err.message || "Failed to update playlist");
+    } finally {
+      setMenuLoadingId(null);
+      setSongMenu(null);
     }
+  };
 
-    await loadPlaylists(); // Refresh
-  } catch (err: any) {
-    console.error("Playlist update failed:", err);
-    toast.error(err.message || "Failed to update playlist");
-  } finally {
-    setMenuLoadingId(null);
-    setSongMenu(null);
-  }
-};
   // ── Playlist selection ────────────────────────────────────
   const selectPlaylist = (id: string | null) => {
     setActivePlaylistId(id);
@@ -279,21 +276,62 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
 
   // ── Create playlist modal ─────────────────────────────────
   const openCreateModal = () => {
-    setNewPlaylistName(""); setNewPlaylistDesc(""); setSelectedSongIds(new Set()); setCreateError("");
+    setNewPlaylistName("");
+    setNewPlaylistDesc("");
+    setSelectedSongIds(new Set());
+    setCreateError("");
     setShowCreateModal(true);
   };
-  const toggleSongSelection = (id: string) =>
-    setSelectedSongIds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const submitCreatePlaylist = async () => {
-    if (!newPlaylistName.trim()) { setCreateError("Playlist name is required"); return; }
+
+  // ✅ FIX 1: toggleSongSelection moved INSIDE the component
+  const toggleSongSelection = (songId: string) => {
+    setSelectedSongIds((prev) => {
+      const next = new Set(prev);
+      next.has(songId) ? next.delete(songId) : next.add(songId);
+      return next;
+    });
+  };
+
+  // ── Delete playlist ───────────────────────────────────────
+  const handleDeletePlaylist = async (e: React.MouseEvent, playlistId: string) => {
+    e.stopPropagation(); // sidebar button click thay nahi
     try {
-      setCreating(true); setCreateError("");
-      const res = await CreatePlaylist({ name: newPlaylistName.trim(), description: newPlaylistDesc.trim() || undefined, songs: Array.from(selectedSongIds) });
-      if (res?.data) setPlaylists((prev) => [res.data, ...prev]);
+      await DeletePlaylist(playlistId, "");
+      toast.success("Playlist deleted");
+      if (activePlaylistId === playlistId) {
+        setActivePlaylistId(null);
+        setActiveSongId(songs[0]?._id ?? null);
+        setIsPlaying(false);
+        setProgress(0);
+        setCurrentTime(0);
+      }
       await loadPlaylists();
-      setShowCreateModal(false);
     } catch (err: any) {
-      setCreateError(err?.message || "Failed to create playlist");
+      toast.error(err.message || "Failed to delete playlist");
+    }
+  };
+
+  // ✅ FIX 2: submitCreatePlaylist added
+  const submitCreatePlaylist = async () => {
+    if (!newPlaylistName.trim()) {
+      setCreateError("Playlist name is required.");
+      return;
+    }
+    try {
+      setCreating(true);
+      setCreateError("");
+      const payload: CreatePlaylistPayload = {
+        name: newPlaylistName.trim(),
+        description: newPlaylistDesc.trim() || undefined,
+        songs: Array.from(selectedSongIds),
+      };
+      await CreatePlaylist("", "", payload);
+      toast.success("Playlist created!");
+      setShowCreateModal(false);
+      await loadPlaylists();
+    } catch (err: any) {
+      console.error("Create playlist error:", err);
+      setCreateError(err.message || "Failed to create playlist.");
     } finally {
       setCreating(false);
     }
@@ -326,10 +364,8 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
         .bar3{animation:bars 0.8s ease-in-out infinite 0.4s}
         .sidebar-drawer{transition:transform 0.28s ease,opacity 0.28s ease}
         .sidebar-backdrop{transition:opacity 0.28s ease}
-        /* Context menu fade-in */
         @keyframes menuIn{from{opacity:0;transform:scale(0.95) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
         .ctx-menu{animation:menuIn 0.15s ease forwards}
-        /* Bottom player (mobile) */
         .bottom-player{display:none}
         @media(max-width:1023px){
           .bottom-player{display:flex}
@@ -382,11 +418,22 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
             {!playlistsLoading && playlists.length === 0 && <div className="px-3 py-4 text-xs text-zinc-600">No playlists yet. Tap + to create one.</div>}
 
             {playlists.map((pl, idx) => (
-              <button key={pl._id} onClick={() => selectPlaylist(pl._id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all mb-0.5 group ${activePlaylistId === pl._id ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"}`}>
-                <span className="text-base w-6 text-center">{PLAYLIST_ICONS[idx % PLAYLIST_ICONS.length]}</span>
-                <span className="flex-1 text-left truncate font-medium">{pl.name}</span>
-                <span className="text-xs text-zinc-600 group-hover:text-zinc-400">{pl.songs?.length ?? 0}</span>
-              </button>
+              <div key={pl._id} className={`flex items-center gap-1 rounded-lg mb-0.5 group transition-all ${activePlaylistId === pl._id ? "bg-white/10" : "hover:bg-white/5"}`}>
+                <button
+                  onClick={() => selectPlaylist(pl._id)}
+                  className={`flex items-center gap-3 flex-1 min-w-0 px-3 py-2.5 text-sm transition-all ${activePlaylistId === pl._id ? "text-white" : "text-zinc-400 hover:text-white"}`}
+                >
+                  <span className="text-base w-6 text-center flex-shrink-0">{PLAYLIST_ICONS[idx % PLAYLIST_ICONS.length]}</span>
+                  <span className="flex-1 text-left truncate font-medium">{pl.name}</span>
+                  <span className="text-xs text-zinc-600 group-hover:text-zinc-400 flex-shrink-0">{pl.songs?.length ?? 0}</span>
+                </button>
+                <button
+                  onClick={(e) => handleDeletePlaylist(e, pl._id)}
+                  className="w-6 h-6 flex-shrink-0 mr-2 rounded flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover:opacity-100 text-xs"
+                  aria-label="Delete playlist"
+                  title="Delete playlist"
+                >✕</button>
+              </div>
             ))}
           </div>
         </aside>
@@ -443,7 +490,6 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
                         onContextMenu={(e) => openSongMenu(e, song._id)}
                         className={`song-row song-grid grid grid-cols-[40px_1fr_180px_80px_80px] gap-4 px-4 py-3 rounded-lg items-center cursor-pointer group transition-all select-none ${isActive ? "bg-white/8" : "hover:bg-white/5"}`}
                       >
-                        {/* Index / playing indicator */}
                         <div className="relative flex items-center justify-center">
                           <span className={`song-index text-sm font-mono ${isActive ? "text-emerald-400" : "text-zinc-500"}`}>
                             {isActive && isPlaying ? (
@@ -457,7 +503,6 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
                           <span className="play-icon absolute items-center justify-center text-white text-sm">{isActive && isPlaying ? "⏸" : "▶"}</span>
                         </div>
 
-                        {/* Title + artist */}
                         <div className="flex items-center gap-3 min-w-0">
                           {song.thumbnail ? (
                             <img src={song.thumbnail} alt={song.title} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" style={{ border: `1px solid ${color}33` }} />
@@ -479,16 +524,13 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
                           {song.plays >= 1_000_000 ? `${(song.plays / 1_000_000).toFixed(1)}M` : song.plays >= 1_000 ? `${(song.plays / 1_000).toFixed(1)}K` : song.plays}
                         </div>
 
-                        {/* Like + duration + menu button */}
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleLike(song._id); }}
                             className={`text-sm opacity-0 group-hover:opacity-100 transition-all ${liked.has(song._id) ? "opacity-100 text-emerald-400" : "text-zinc-500 hover:text-white"}`}
                           >{liked.has(song._id) ? "♥" : "♡"}</button>
                           <span className="text-xs text-zinc-500 font-mono">{formatDuration(song.duration)}</span>
-                          {/* ⋮ menu trigger */}
                           <button
-                            song-menu-btn="true"
                             onClick={(e) => openSongMenu(e, song._id)}
                             className="song-menu-btn w-6 h-6 rounded flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition-all opacity-0 text-base leading-none flex-shrink-0"
                             aria-label="Song options"
@@ -636,14 +678,8 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
         <div
           ref={menuRef}
           className="ctx-menu fixed z-[9999] w-56 rounded-xl overflow-hidden shadow-2xl"
-          style={{
-            left: songMenu.x,
-            top: songMenu.y,
-            background: "#1a1a26",
-            border: "1px solid rgba(255,255,255,0.1)",
-          }}
+          style={{ left: songMenu.x, top: songMenu.y, background: "#1a1a26", border: "1px solid rgba(255,255,255,0.1)" }}
         >
-          {/* Song header */}
           {menuSong && (
             <div className="flex items-center gap-3 px-4 py-3 border-b border-white/8">
               {menuSong.thumbnail ? (
@@ -658,7 +694,6 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
             </div>
           )}
 
-          {/* Play now */}
           <button
             onClick={() => { playSong(songMenu.songId); setSongMenu(null); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:text-white hover:bg-white/8 transition-colors text-left"
@@ -666,7 +701,6 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
             <span className="text-base w-5 text-center">▶</span> Play now
           </button>
 
-          {/* Divider + playlist section */}
           {playlists.length > 0 && (
             <>
               <div className="border-t border-white/8 mx-3 my-1" />
@@ -683,11 +717,7 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
                       key={pl._id}
                       onClick={() => toggleSongInPlaylist(pl._id, songMenu.songId, inPlaylist)}
                       disabled={!!menuLoadingId}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left disabled:opacity-60 ${
-                        inPlaylist
-                          ? "text-emerald-400 hover:bg-emerald-400/10"
-                          : "text-zinc-300 hover:text-white hover:bg-white/8"
-                      }`}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left disabled:opacity-60 ${inPlaylist ? "text-emerald-400 hover:bg-emerald-400/10" : "text-zinc-300 hover:text-white hover:bg-white/8"}`}
                     >
                       <span className="text-base w-5 text-center flex-shrink-0">
                         {isLoading ? (
@@ -712,7 +742,6 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
             </>
           )}
 
-          {/* Create new playlist from menu */}
           <div className="border-t border-white/8 mx-3 my-1" />
           <button
             onClick={() => { setSongMenu(null); openCreateModal(); }}
@@ -735,21 +764,39 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Name</label>
-                <input autoFocus type="text" value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} placeholder="My Awesome Playlist"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-emerald-400/50 transition-colors" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  placeholder="My Awesome Playlist"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-emerald-400/50 transition-colors"
+                />
               </div>
               <div>
                 <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Description (optional)</label>
-                <textarea value={newPlaylistDesc} onChange={(e) => setNewPlaylistDesc(e.target.value)} placeholder="What's this playlist about?" rows={2}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-emerald-400/50 transition-colors resize-none" />
+                <textarea
+                  value={newPlaylistDesc}
+                  onChange={(e) => setNewPlaylistDesc(e.target.value)}
+                  placeholder="What's this playlist about?"
+                  rows={2}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-emerald-400/50 transition-colors resize-none"
+                />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Add songs ({selectedSongIds.size} selected)</label>
+                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">
+                  Add songs ({selectedSongIds.size} selected)
+                </label>
                 <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg divide-y divide-white/5">
                   {songs.length === 0 && <div className="px-3 py-4 text-xs text-zinc-600">No songs available</div>}
                   {songs.map((song) => (
                     <label key={song._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 cursor-pointer transition-colors">
-                      <input type="checkbox" checked={selectedSongIds.has(song._id)} onChange={() => toggleSongSelection(song._id)} className="accent-emerald-400" />
+                      <input
+                        type="checkbox"
+                        checked={selectedSongIds.has(song._id)}
+                        onChange={() => toggleSongSelection(song._id)}
+                        className="accent-emerald-400"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{song.title}</div>
                         <div className="text-xs text-zinc-500 truncate">{getArtistName(song.artist)}</div>
@@ -762,8 +809,18 @@ const toggleSongInPlaylist = async (playlistId: string, songId: string, alreadyI
               {createError && <div className="text-xs text-red-400">{createError}</div>}
 
               <div className="flex items-center gap-3 pt-1">
-                <button onClick={() => setShowCreateModal(false)} disabled={creating} className="flex-1 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={submitCreatePlaylist} disabled={creating} className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-emerald-400 text-black hover:bg-emerald-300 transition-colors disabled:opacity-50">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={creating}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitCreatePlaylist}
+                  disabled={creating}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-emerald-400 text-black hover:bg-emerald-300 transition-colors disabled:opacity-50"
+                >
                   {creating ? "Creating…" : "Create Playlist"}
                 </button>
               </div>

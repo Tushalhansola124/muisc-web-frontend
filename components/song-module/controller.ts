@@ -77,12 +77,18 @@ const axiosInstance = axios.create({
 // ======================================================
 
 export const GetSongs = async (
+  token: string
 ): Promise<ISongsResponse> => {
 
   try {
 
     const response = await axiosInstance.get(
       API_ENDPOINTS.song.get,
+       {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
   
     )
 

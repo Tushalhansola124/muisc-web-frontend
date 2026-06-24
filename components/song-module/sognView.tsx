@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input"
 import {
   DeleteSong,
   GetSongs,
+  ISong,
 } from "./controller"
 import { useSession } from "next-auth/react"
 
@@ -62,7 +63,7 @@ type Song = {
 
 export function SongsTables() {
 
-  const [songs, setSongs] = useState<Song[]>([])
+  const [songs, setSongs] = useState<ISong[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
   const { data: session } = useSession()
@@ -83,8 +84,8 @@ export function SongsTables() {
     try {
 
       const res = await GetSongs(token)
-
-      console.log("Songs Response:", res)
+      
+    
 
       if (
         res.success ||

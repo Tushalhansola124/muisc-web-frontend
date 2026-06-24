@@ -22,7 +22,6 @@ import {
   Disc3Icon,
   ListMusicIcon,
   ClockIcon,
-  HeartIcon,
   SearchIcon,
   BarChart3Icon,
   BellIcon,
@@ -125,7 +124,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       {/* Navigation */}
-      <SidebarContent className="px-3 py-6">
+      <SidebarContent className="py-6">
         <NavMain items={data.navMain} />
       </SidebarContent>
 

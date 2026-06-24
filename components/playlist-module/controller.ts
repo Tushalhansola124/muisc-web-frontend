@@ -256,38 +256,77 @@ id: string, songId: string) => {
   }
 };
 
-// Add this new function
-// ======================================================
+// =====================================
 // ADD SONG TO PLAYLIST
-// ======================================================
-
-export const AddSongToPlaylist = async (playlistId: string, songId: string) => {
+// =====================================
+export const AddSongToPlaylist = async (
+  playlistId: string,
+  songId: string,
+  token: string
+) => {
   try {
-    const headers = await getAuthHeaders();
- const response = await axiosInstance.post(
-      API_ENDPOINTS.playlist.add,       
+    const response = await axios.post(
+      `${SERVER_URL}${API_ENDPOINTS.playlist.addSong}${playlistId}/${songId}`,
+      {},
       {
-        playlistId,
-        songId,
-        
-      },
-      { headers }
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
 
-    console.log("ADD SONG TO PLAYLIST SUCCESS:", response.data);
     return response.data;
   } catch (error: any) {
-    console.error("ADD SONG TO PLAYLIST ERROR:", {
-      status: error?.response?.status,
-      data: error?.response?.data,
-      message: error?.message
+    console.log("ADD SONG TO PLAYLIST FULL ERROR:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
     });
 
+    if (error.response?.status === 403) {
+      throw new Error("Access denied. You can only modify your own playlists.");
+    }
+
     throw new Error(
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to add song to playlist"
+      error?.response?.data?.message || 
+      "Failed To Add Song To Playlist"
     );
   }
 };
 
+// =====================================
+// REMOVE SONG FROM PLAYLIST
+// =====================================
+export const RemoveSongFromPlaylist = async (
+  playlistId: string,
+  songId: string,
+  token: string
+) => {
+  try {
+    const response = await axios.delete(
+      `${SERVER_URL}${API_ENDPOINTS.playlist.removeSong}${playlistId}/${songId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log("REMOVE SONG FROM PLAYLIST FULL ERROR:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+
+    if (error.response?.status === 403) {
+      throw new Error("Access denied. You can only modify your own playlists.");
+    }
+
+    throw new Error(
+      error?.response?.data?.message || 
+      "Failed To Remove Song From Playlist"
+    );
+  }
+};

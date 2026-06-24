@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+
 import { GetArtistById } from "@/components/artist-module/controller";
 import { ISong } from "@/components/song-module/controller";
 import MusicHomePage from "@/components/song-module/muisc-home";

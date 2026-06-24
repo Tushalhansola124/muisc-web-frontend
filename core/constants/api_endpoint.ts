@@ -47,7 +47,9 @@ export const API_ENDPOINTS = {
     add:"/api/playlist/create",
     update:"/api/playlist/update/",
     delete:"/api/playlist/delete/",
-    getById:"/api/playlist/"
+    getById:"/api/playlist/",
+    addSong:"/api/playlist/add-song/",
+    removeSong:"/api/playlist/remove-song/"
   }
 
 };
