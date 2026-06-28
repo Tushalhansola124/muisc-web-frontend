@@ -20,6 +20,7 @@ function LoginForm({
   const router = useRouter();
 
   const { data: session, status } = useSession();
+  console.log("The Session =======>",session)
 
   const {
     register,
@@ -48,17 +49,19 @@ function LoginForm({
     }
   }
 
-  useEffect(() => {
-    if (status === "authenticated") {
-      const role = session?.user?.role;
+ useEffect(() => {
+  if (status === "authenticated") {
+    const role = session?.user?.role;
 
-      if (role === "admin" || role === "artist") {
-        router.push("/dashboard");
-      } else {
-        router.push("/");
-      }
+    if (role === "admin") {
+      router.push("/dashboard");
+    } else if (role === "artist") {
+      router.push("/dashboard-artist");
+    } else {
+      router.push("/");
     }
-  }, [session, status, router]);
+  }
+}, [status, session, router]);
 
   return (
     <form

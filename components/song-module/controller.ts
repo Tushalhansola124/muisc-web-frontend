@@ -147,7 +147,7 @@ export const CreateSong = async (
 
 export const GetSongById = async (
   id: string,
-
+  token:string,
 ): Promise<ISingleSongResponse> => {
 
   try {
@@ -252,3 +252,40 @@ export const DeleteSong = async (
     )
   }
 }
+
+
+
+// GetByArtist
+
+export const GetSongByArtist = async (
+  token: string,
+  artistId: string
+): Promise<ISongsResponse> => {
+  try {
+    console.log("API Endpoint:", API_ENDPOINTS.song.getByArtist);
+    console.log("Artist ID:", artistId);
+    console.log(
+      "Final URL:",
+      `${API_ENDPOINTS.song.getByArtist}${artistId}`
+    );
+    console.log("Token:", token);
+
+    const response = await axiosInstance.get(
+      `${API_ENDPOINTS.song.getByArtist}${artistId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    console.log("Response:", response.data);
+
+    return response.data;
+  } catch (error: any) {
+    console.log("GET SONG BY ARTIST ERROR:", error.response?.data);
+    console.log("Status:", error.response?.status);
+
+    throw error;
+  }
+};

@@ -15,7 +15,8 @@ export const API_ENDPOINTS = {
     add:"/api/artist/artistCreate",
     update:"/api/artist/artistupdate/",
     delete:"/api/artist/artistDelete/",
-    getById:"/api/artist/getArtistById/"
+    getById:"/api/artist/getArtistById/",
+    getOwnArtist:"/api/artist/my-artist"
   },
   genre:{
     get:"/api/genre/getall",
@@ -29,7 +30,8 @@ export const API_ENDPOINTS = {
     add:"api/album/create",
     update:"/api/album/update/",
     delete:"/api/album/delete/",
-    getById:"/api/album/"
+    getById:"/api/album/",
+    getArtistAlbums:"/api/album/artist/albums"
   },
   song:{
     get:"/api/song/songGetAll",
@@ -39,7 +41,8 @@ export const API_ENDPOINTS = {
     getById:"/api/song/getByIdSong/",
     likeSong: "/api/likeSong/like/",
     unlikeSong:"/api/likeSong/unlike/",
-    isLikeSong:"/api/likeSong/is-liked/"
+    isLikeSong:"/api/likeSong/is-liked/",
+    getByArtist:"/api/song/songs/"
 
   },
   playlist:{

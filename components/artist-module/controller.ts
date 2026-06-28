@@ -15,6 +15,7 @@ import { cookies } from "next/headers";
 export interface IArtist {
   songs: never[];
   artist: any;
+  userId: string
   _id: string
   name: string
   bio: string
@@ -257,6 +258,37 @@ export const DeleteArtist = async (
     throw new Error(
       error?.response?.data?.message ||
       "Delete Artist Failed"
+    );
+  }
+};
+
+
+
+
+export const GetOwnArtist = async () => {
+  try {
+
+    const headers =
+      await getAuthHeaders();
+
+    const response = await axios.get(
+      `${SERVER_URL}${API_ENDPOINTS.artist.getOwnArtist}`,
+        {
+        headers,
+      },
+  
+    );
+
+    return response.data;
+
+  } catch (error: any) {
+
+   
+
+    throw new Error(
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed To Fetch Artists"
     );
   }
 };

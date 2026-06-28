@@ -9,14 +9,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MoveLeftIcon } from "lucide-react";
 
 import { CreateArtist, UpdateArtist, GetArtistById } from "./controller";
-import { MoveLeftIcon } from "lucide-react";
+import { GetUsers } from "../user-module/user-controller";
 
 type ArtistFormProps = {
   artistId?: string;
   isEdit?: boolean;
+};
+
+type UserOption = {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
 };
 
 export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps) {
@@ -24,17 +40,38 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
   const [preview, setPreview] = useState<string | null>(null);
+  const [users, setUsers] = useState<UserOption[]>([]);
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm({
-    defaultValues: { name: "", bio: "" },
+    defaultValues: {
+      name: "",
+      bio: "",
+      userId: "",           // New field for selected user
+    },
   });
 
-  // Fetch data for Edit mode
+  // Fetch Users for Dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await GetUsers();
+        if (res.success && res.data) {
+          setUsers(res.data);
+        }
+      } catch (error) {
+        console.error("Failed to load users", error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Fetch Artist Data for Edit
   useEffect(() => {
     if (!isEdit || !artistId) {
       setInitialLoading(false);
@@ -45,19 +82,15 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
       setInitialLoading(true);
       try {
         const res = await GetArtistById(artistId);
-        console.log("✅ Fetched Artist:", res);
-
         if (res.success && res.data) {
           const artist = res.data;
           setValue("name", artist.name || "");
           setValue("bio", artist.bio || "");
+          setValue("userId", artist.userId || ""); // if you have userId in artist
           if (artist.image) setPreview(artist.image);
-        } else {
-          toast.error("Artist not found");
         }
       } catch (error: any) {
-        console.error(error);
-        toast.error(error.message || "Failed to load artist data");
+        toast.error("Failed to load artist data");
       } finally {
         setInitialLoading(false);
       }
@@ -72,6 +105,7 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
 
     formData.append("name", data.name);
     formData.append("bio", data.bio);
+    if (data.userId) formData.append("userId", data.userId);
 
     const fileInput = (document.getElementById("image") as HTMLInputElement)?.files;
     if (fileInput?.[0]) {
@@ -99,47 +133,90 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
   }
 
   return (
-    <div className="max-w-8xl flex justify-center w-auto py-10 px-4">
-       
-      <Card>
-          <Button 
-          onClick={()=>router.back()}
-          className="w-30 mx-4"><MoveLeftIcon/>Back</Button>
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold">
-            {isEdit ? "Edit Artist" : "Create New Artist"}
-          </CardTitle>
-          <p className="text-muted-foreground">
-            {isEdit ? "Update artist information" : "Add a new artist to the platform"}
+    <div className="max-w-8xl mx-10 py-10 px-4">
+      <Card className="shadow-xl">
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
+              <MoveLeftIcon className="h-5 w-5" /> Back
+            </Button>
+            <CardTitle className="text-3xl font-bold">
+              {isEdit ? "Edit Artist" : "Create New Artist"}
+            </CardTitle>
+          </div>
+          <p className="text-muted-foreground mt-2">
+            {isEdit ? "Update artist details and profile" : "Add a new artist to your music platform"}
           </p>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <CardContent className="pt-8">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            {/* Artist Name */}
             <div className="space-y-2">
               <Label>Artist Name</Label>
               <Input placeholder="Arijit Singh" {...register("name")} />
             </div>
 
+            {/* Bio */}
             <div className="space-y-2">
-              <Label>Bio</Label>
-              <Textarea placeholder="Enter artist biography..." rows={5} {...register("bio")} />
+              <Label>Biography</Label>
+              <Textarea
+                placeholder="Enter detailed biography of the artist..."
+                rows={6}
+                {...register("bio")}
+              />
             </div>
 
+            {/* User Dropdown */}
+            <div className="space-y-2">
+              <Label>Associated User</Label>
+
+              <Select
+                value={watch("userId") || ""}
+                onValueChange={(val) => setValue("userId", val)}
+              >
+                <SelectTrigger className="w-full h-12">
+                  <SelectValue placeholder="Select User">
+                    {users.find((u) => u._id === watch("userId"))
+                      ? `${users.find((u) => u._id === watch("userId"))?.firstName} ${users.find((u) => u._id === watch("userId"))?.lastName}`
+                      : ""}
+                  </SelectValue>
+                </SelectTrigger>
+
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem
+                      key={user._id}
+                      value={user._id}
+                    >
+                      <div className="flex flex-col py-1">
+                        <span className="font-medium">
+                          {user.firstName} {user.lastName}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Profile Image */}
             <div className="space-y-2">
               <Label>Profile Image</Label>
               <Input id="image" type="file" accept="image/*" />
               {preview && (
-                <img src={preview} alt="Preview" className="w-32 h-32 object-cover rounded-lg border mt-3" />
+                <div className="mt-4">
+                  <img src={preview} alt="Preview" className="w-40 h-40 object-cover rounded-xl border shadow" />
+                </div>
               )}
             </div>
 
+            {/* Buttons */}
             <div className="flex gap-4 pt-6">
               <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
                 Cancel
               </Button>
               <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? (isEdit ? "Updating..." : "Creating...") : (isEdit ? "Update Artist" : "Create Artist")}
+                {loading ? (isEdit ? "Updating Artist..." : "Creating Artist...") : (isEdit ? "Update Artist" : "Create Artist")}
               </Button>
             </div>
           </form>

@@ -282,3 +282,33 @@ export const DeleteAlbum = async (
     );
   }
 };
+
+
+
+export const GetAlbumsForArtist = async (): Promise<IAlbumsResponse> => {
+  try {
+    const headers = await getAuthHeaders();
+
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.album.getArtistAlbums,
+      {
+        headers,
+      }
+    );
+
+    return response.data;
+
+  } catch (error: any) {
+
+    console.log(
+      "GET ALBUMS ERROR:",
+      error
+    );
+
+    throw new Error(
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed To Fetch Albums"
+    );
+  }
+};

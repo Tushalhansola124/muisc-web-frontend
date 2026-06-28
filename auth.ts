@@ -60,6 +60,7 @@ export const authConfig = {
 
           return {
             id: data.user.id,
+            artistId: data.user.artistId,
             firstName:
               data.user.firstName,
 
@@ -103,6 +104,7 @@ export const authConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.artistId = user.artistId;
         token.firstName =
           user.firstName;
 
@@ -134,6 +136,9 @@ export const authConfig = {
     }) {
       session.user.id =
         token.id as string;
+      
+      session.user.artistId =
+        token.artistId as string;
 
       session.user.firstName =
         token.firstName as string;
