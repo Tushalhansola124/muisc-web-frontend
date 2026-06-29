@@ -55,11 +55,11 @@ const data = {
       icon: <HomeIcon className="h-5 w-5" />,
     },
 
-    {
-      title: "Genres",
-      url: "/dashboard/genres",
-      icon: <TagIcon className="h-5 w-5" />,
-    },
+    // {
+    //   title: "Genres",
+    //   url: "/dashboard/genres",
+    //   icon: <TagIcon className="h-5 w-5" />,
+    // },
     {
       title: "Albums",
       url: "/dashboard-artist/albums-artist",
@@ -71,26 +71,26 @@ const data = {
       url: "/dashboard-artist/artistSong",
       icon: <ListMusicIcon className="h-5 w-5" />,
     },
-    {
-      title: "History",
-      url: "/history",
-      icon: <ClockIcon className="h-5 w-5" />,
-    },
-    {
-      title: "Search",
-      url: "/search",
-      icon: <SearchIcon className="h-5 w-5" />,
-    },
+    // {
+    //   title: "History",
+    //   url: "/history",
+    //   icon: <ClockIcon className="h-5 w-5" />,
+    // },
+    // {
+    //   title: "Search",
+    //   url: "/search",
+    //   icon: <SearchIcon className="h-5 w-5" />,
+    // },
     {
       title: "Analytics",
       url: "/analytics",
       icon: <BarChart3Icon className="h-5 w-5" />,
     },
-    {
-      title: "Notifications",
-      url: "/notifications",
-      icon: <BellIcon className="h-5 w-5" />,
-    },
+    // {
+    //   title: "Notifications",
+    //   url: "/notifications",
+    //   icon: <BellIcon className="h-5 w-5" />,
+    // },
   ],
 }
 

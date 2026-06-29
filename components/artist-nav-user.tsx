@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, SparklesIcon, BadgeCheckIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 
 export function NavUserArtist({
   user,
@@ -33,6 +34,7 @@ export function NavUserArtist({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter();
   const {data:session} = useSession()
   const handleLogout = () => {
     signOut({ 
@@ -90,7 +92,11 @@ export function NavUserArtist({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem
+              onClick={()=>{
+                router.push("/profile")
+              }}
+              >
                 <BadgeCheckIcon
                 />
                 Account
