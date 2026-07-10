@@ -617,7 +617,7 @@ export default function SongFormArtists({
                                     {(watch("genre") || []).map((genreId) => {
                                         const genreName = genres.find((g) => g._id === genreId)?.name
                                         return (
-                                            <Badge key={genreId} variant="secondary" className="bg-zinc-100 text-zinc-700">
+                                            <Badge key={genreId}  className="bg-zinc-100 text-zinc-700">
                                                 {genreName}
                                                 <button
                                                     type="button"

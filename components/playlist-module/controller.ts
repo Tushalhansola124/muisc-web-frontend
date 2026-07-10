@@ -135,27 +135,48 @@ export const GetPlaylists = async () => {
 //   }
 // };
 
-export const CreatePlaylist = async (
-  playlistId: string, 
-  songId: string, 
-  data: CreatePlaylistPayload
-) => {
+// export const CreatePlaylist = async (
+//   playlistId: string, 
+//   songId: string, 
+//   data: CreatePlaylistPayload
+// ) => {
+//   try {
+//     const headers = await getAuthHeaders();
+
+//     const response = await axiosInstance.post(
+//       API_ENDPOINTS.playlist.add,       
+//       {
+//         playlistId,
+//         songId,
+//         ...data
+//       },
+//       { headers }
+//     );
+
+//     return response.data;
+//   } catch (error: any) {
+//     console.log("CREATE PLAYLIST ERROR:", error);
+//     throw new Error(
+//       error?.response?.data?.message ||
+//       error?.message ||
+//       "Create Playlist Failed"
+//     );
+//   }
+// };
+
+export const CreatePlaylist = async (data: CreatePlaylistPayload) => {
   try {
     const headers = await getAuthHeaders();
 
     const response = await axiosInstance.post(
-      API_ENDPOINTS.playlist.add,       
-      {
-        playlistId,
-        songId,
-        ...data
-      },
+      API_ENDPOINTS.playlist.add,
+      data,                    // Send data directly
       { headers }
     );
 
     return response.data;
   } catch (error: any) {
-    console.log("CREATE PLAYLIST ERROR:", error);
+    console.error("CREATE PLAYLIST ERROR:", error?.response?.data || error);
     throw new Error(
       error?.response?.data?.message ||
       error?.message ||
@@ -233,7 +254,8 @@ export const UpdatePlaylist = async (
 // ======================================================
 
 export const DeletePlaylist = async (
-id: string, songId: string) => {
+id: string
+) => {
   try {
     const headers = await getAuthHeaders();
 

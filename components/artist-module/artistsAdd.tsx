@@ -173,7 +173,7 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
 
               <Select
                 value={watch("userId") || ""}
-                onValueChange={(val) => setValue("userId", val)}
+                onValueChange={(val:any) => setValue("userId", val)}
               >
                 <SelectTrigger className="w-full h-12">
                   <SelectValue placeholder="Select User">

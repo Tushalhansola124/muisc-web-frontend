@@ -14,6 +14,11 @@ import Link from "next/link";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
+
+interface Props {
+  songs: ISong[]   // ← Added this
+}
+
 // ─── Types ───────────────────────────────────────────────────
 type PlaylistSong = string | ISong;
 
@@ -152,13 +157,23 @@ export default function MusicHomePage({ songs }: Props) {
   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
   // ── Audio effects ─────────────────────────────────────────
+  // NOTE: This effect is kept as a fallback/sync mechanism for cases where
+  // activeSongId changes from somewhere other than playSong() (e.g. external
+  // state changes). The primary, reliable playback trigger now happens
+  // directly and synchronously inside playSong() itself — see below.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentSong?.audioUrl) return;
-    audio.src = currentSong.audioUrl;
-    audio.load();
-    audio.volume = volume / 100;
-    if (isPlaying) audio.play().catch(console.error);
+    // Avoid re-loading/re-triggering if the src is already correct
+    // (playSong already set it directly, so this becomes a no-op in that case).
+    const alreadyCorrectSrc =
+      audio.src && audio.src.endsWith(currentSong.audioUrl);
+    if (!alreadyCorrectSrc) {
+      audio.src = currentSong.audioUrl;
+      audio.load();
+      audio.volume = volume / 100;
+      if (isPlaying) audio.play().catch(console.error);
+    }
   }, [activeSongId]); // eslint-disable-line
 
   useEffect(() => {
@@ -183,8 +198,7 @@ export default function MusicHomePage({ songs }: Props) {
     const onEnded = () => {
       const next = safeIndex + 1;
       if (next < visibleSongs.length) {
-        setActiveSongId(visibleSongs[next]._id);
-        setIsPlaying(true);
+        playSong(visibleSongs[next]);
       } else {
         setIsPlaying(false);
         setProgress(0);
@@ -199,18 +213,43 @@ export default function MusicHomePage({ songs }: Props) {
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [safeIndex, visibleSongs]);
+  }, [safeIndex, visibleSongs]); // eslint-disable-line
 
   // ── Playback handlers ─────────────────────────────────────
-  const playSong = (songId: string) => {
-    if (songId === activeSongId) { setIsPlaying((p) => !p); }
-    else { setActiveSongId(songId); setIsPlaying(true); setProgress(0); setCurrentTime(0); }
+  // ✅ FIX: playSong now takes the full song object (not just an id) and
+  // sets audio.src / plays it IMMEDIATELY and synchronously on click,
+  // instead of relying solely on the `activeSongId` useEffect to catch up
+  // on the next render. Previously, clicking the 2nd (or any non-active)
+  // song only updated state, and the effect that actually swapped
+  // audio.src could race with the *previous* song's play() call / lag a
+  // render behind — resulting in the first song continuing to play.
+  const playSong = (song: ISong) => {
+    const audio = audioRef.current;
+
+    // Same song clicked again → just toggle play/pause
+    if (song._id === activeSongId) {
+      setIsPlaying((p) => !p);
+      return;
+    }
+
+    setActiveSongId(song._id);
+    setIsPlaying(true);
+    setProgress(0);
+    setCurrentTime(0);
+
+    if (audio && song.audioUrl) {
+      audio.src = song.audioUrl;
+      audio.load();
+      audio.volume = volume / 100;
+      audio.play().catch(console.error);
+    }
   };
+
   const playPrev = () => {
-    if (safeIndex > 0) { setActiveSongId(visibleSongs[safeIndex - 1]._id); setIsPlaying(true); setProgress(0); }
+    if (safeIndex > 0) playSong(visibleSongs[safeIndex - 1]);
   };
   const playNext = () => {
-    if (safeIndex < visibleSongs.length - 1) { setActiveSongId(visibleSongs[safeIndex + 1]._id); setIsPlaying(true); setProgress(0); }
+    if (safeIndex < visibleSongs.length - 1) playSong(visibleSongs[safeIndex + 1]);
   };
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
@@ -283,7 +322,6 @@ export default function MusicHomePage({ songs }: Props) {
     setShowCreateModal(true);
   };
 
-  // ✅ FIX 1: toggleSongSelection moved INSIDE the component
   const toggleSongSelection = (songId: string) => {
     setSelectedSongIds((prev) => {
       const next = new Set(prev);
@@ -296,7 +334,7 @@ export default function MusicHomePage({ songs }: Props) {
   const handleDeletePlaylist = async (e: React.MouseEvent, playlistId: string) => {
     e.stopPropagation(); // sidebar button click thay nahi
     try {
-      await DeletePlaylist(playlistId, "");
+      await DeletePlaylist(playlistId);
       toast.success("Playlist deleted");
       if (activePlaylistId === playlistId) {
         setActivePlaylistId(null);
@@ -311,7 +349,6 @@ export default function MusicHomePage({ songs }: Props) {
     }
   };
 
-  // ✅ FIX 2: submitCreatePlaylist added
   const submitCreatePlaylist = async () => {
     if (!newPlaylistName.trim()) {
       setCreateError("Playlist name is required.");
@@ -325,7 +362,7 @@ export default function MusicHomePage({ songs }: Props) {
         description: newPlaylistDesc.trim() || undefined,
         songs: Array.from(selectedSongIds),
       };
-      await CreatePlaylist("", "", payload);
+      await CreatePlaylist(payload);
       toast.success("Playlist created!");
       setShowCreateModal(false);
       await loadPlaylists();
@@ -486,7 +523,7 @@ export default function MusicHomePage({ songs }: Props) {
                     return (
                       <div
                         key={song._id}
-                        onClick={() => playSong(song._id)}
+                        onClick={() => playSong(song)}
                         onContextMenu={(e) => openSongMenu(e, song._id)}
                         className={`song-row song-grid grid grid-cols-[40px_1fr_180px_80px_80px] gap-4 px-4 py-3 rounded-lg items-center cursor-pointer group transition-all select-none ${isActive ? "bg-white/8" : "hover:bg-white/5"}`}
                       >
@@ -617,7 +654,7 @@ export default function MusicHomePage({ songs }: Props) {
                 {visibleSongs.filter((s) => s._id !== activeSongId).slice(0, 6).map((song) => {
                   const color = COLORS[songs.indexOf(song) % COLORS.length] ?? "#2a9d8f";
                   return (
-                    <button key={song._id} onClick={() => playSong(song._id)} className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-white/5 transition-all group">
+                    <button key={song._id} onClick={() => playSong(song)} className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-white/5 transition-all group">
                       {song.thumbnail ? (
                         <img src={song.thumbnail} alt={song.title} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                       ) : (
@@ -695,7 +732,7 @@ export default function MusicHomePage({ songs }: Props) {
           )}
 
           <button
-            onClick={() => { playSong(songMenu.songId); setSongMenu(null); }}
+            onClick={() => { if (menuSong) playSong(menuSong); setSongMenu(null); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:text-white hover:bg-white/8 transition-colors text-left"
           >
             <span className="text-base w-5 text-center">▶</span> Play now

@@ -27,7 +27,8 @@ useEffect(() => {
   const fetchSong = async () => {
     try {
       setLoading(true);
-      const response = await GetSongById(songId);
+      const token = session?.user?.token;
+      const response = await GetSongById(token!  , songId);
       
       setSong(response.data);
       setLikeCount(response.data.likes || 0);

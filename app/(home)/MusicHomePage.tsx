@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { GetArtists } from "@/components/artist-module/controller";
-import Link from "next/link";
+import { LikeArtist, UnLikeArtist, isLikeSong } from "@/components/artist-module/like-contoller";
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState, AppDispatch } from '@/store';
+
+import { toggleLike, setLikeStatus } from '@/store/slices/artistLikeSlice';
 import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -12,6 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +37,7 @@ interface ISong {
   plays?: number;
   createdAt?: string;
 }
+
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -61,9 +67,102 @@ function MusicIcon({ className }: { className?: string }) {
   );
 }
 
+function HeartIcon({ filled, className }: { filled: boolean; className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 2}
+    >
+      <path d="M12 21s-6.716-4.35-9.428-8.04C.665 10.31 1.1 6.6 3.99 4.95c2.45-1.4 5.13-.6 6.51 1.32.4.55.7 1.07.9 1.5.2-.43.5-.95.9-1.5 1.38-1.92 4.06-2.72 6.51-1.32 2.89 1.65 3.325 5.36.418 8.01C18.716 16.65 12 21 12 21z" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+      <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ─── Toast (lightweight, no external dep) ──────────────────────────────────────
+
+function useToast() {
+  const [toast, setToast] = useState<{ id: number; message: string; type: "error" | "success" } | null>(
+    null
+  );
+
+  const showToast = useCallback((message: string, type: "error" | "success" = "error") => {
+    const id = Date.now();
+    setToast({ id, message, type });
+    setTimeout(() => {
+      setToast((curr) => (curr?.id === id ? null : curr));
+    }, 3000);
+  }, []);
+
+  return { toast, showToast };
+}
+
+function ToastViewport({ toast }: { toast: { message: string; type: "error" | "success" } | null }) {
+  if (!toast) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <div
+        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium ${
+          toast.type === "error"
+            ? "bg-red-950/90 border-red-800/60 text-red-200"
+            : "bg-emerald-950/90 border-emerald-800/60 text-emerald-200"
+        } backdrop-blur-md`}
+      >
+        {toast.type === "error" ? (
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
+          </svg>
+        ) : (
+          <HeartIcon filled className="w-4 h-4 shrink-0" />
+        )}
+        {toast.message}
+      </div>
+    </div>
+  );
+}
+
 // ─── Artist Card ──────────────────────────────────────────────────────────────
 
-function ArtistCard({ artist }: { artist: IArtist }) {
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return `${n}`;
+}
+
+function ArtistCard({
+  artist,
+  token,
+  isAuthenticated,
+  onAuthRequired,
+  onError,
+}: {
+  artist: IArtist;
+  token?: string;
+  isAuthenticated: boolean;
+  onAuthRequired: () => void;
+  onError: (msg: string) => void;
+}) {
+  const dispatch = useDispatch<AppDispatch>();
+  const liked = useSelector((state: RootState) =>
+    state.artistLikes.likedArtists[artist._id] ?? false
+  );
+  const likeCount = useSelector((state: RootState) =>
+    state.artistLikes.likeCounts[artist._id] ?? artist.followers ?? 0
+  );
+
+  const [pending, setPending] = useState(false);
+
   const initials = artist.name
     .split(" ")
     .map((w) => w[0])
@@ -71,39 +170,111 @@ function ArtistCard({ artist }: { artist: IArtist }) {
     .toUpperCase()
     .slice(0, 2);
 
+  // Initial check
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    const checkStatus = async () => {
+      try {
+        const res: any = await isLikeSong(artist._id, token);
+        const likedStatus = res?.isFollowing ?? res?.isLiked ?? false;
+        const count = res?.followers ?? res?.likes ?? artist.followers ?? 0;
+
+        dispatch(setLikeStatus({ artistId: artist._id, liked: likedStatus, count }));
+      } catch (err) {
+        // Silent
+      }
+    };
+
+    checkStatus();
+  }, [artist._id, token, isAuthenticated, dispatch]);
+
+  const handleToggleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated || !token) {
+      onAuthRequired();
+      return;
+    }
+    if (pending) return;
+
+    setPending(true);
+    const wasLiked = liked;
+    const newCount = wasLiked ? Math.max(0, likeCount - 1) : likeCount + 1;
+
+    dispatch(toggleLike({ artistId: artist._id, count: newCount }));
+
+    try {
+      const res: any = wasLiked
+        ? await UnLikeArtist(artist._id, token)
+        : await LikeArtist(artist._id, token);
+
+      const serverCount = res?.followers ?? res?.likes ?? newCount;
+      dispatch(setLikeStatus({
+        artistId: artist._id,
+        liked: !wasLiked,
+        count: serverCount
+      }));
+    } catch (err: any) {
+      dispatch(setLikeStatus({
+        artistId: artist._id,
+        liked: wasLiked,
+        count: likeCount
+      }));
+      onError(err?.message || "Failed to update like");
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
-    <Link
-      href={`/artists/${artist._id}`}
-      className="group flex flex-col items-center gap-3 cursor-pointer"
-    >
-      <div className="relative w-full aspect-square rounded-2xl overflow-hidden ring-2 ring-transparent group-hover:ring-violet-500 transition-all duration-300">
-        {artist.image ? (
-          <img
-            src={artist.image}
-            alt={artist.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white text-2xl font-bold tracking-wider">
-            {initials}
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
-            <PlayIcon className="w-5 h-5 text-white ml-0.5" />
-          </div>
+  <Link
+    href={`/artists/${artist._id}`}
+    className="group flex flex-col items-center gap-3 text-center"
+  >
+    <div className="relative w-full aspect-square">
+      {artist.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={artist.image}
+          alt={artist.name}
+          className="w-full h-full object-cover rounded-2xl border border-zinc-800/60 group-hover:border-zinc-700 transition-all duration-200"
+        />
+      ) : (
+        <div className="w-full h-full rounded-2xl bg-gradient-to-br from-violet-800 to-fuchsia-800 flex items-center justify-center border border-zinc-800/60 group-hover:border-zinc-700 transition-all duration-200">
+          <span className="text-white font-bold text-lg">{initials}</span>
         </div>
-      </div>
-      <div className="text-center w-full">
-        <p className="text-white font-semibold text-sm truncate">{artist.name}</p>
-        {artist.followers && (
-          <p className="text-zinc-500 text-xs mt-0.5">
-            {(artist.followers / 1_000_000).toFixed(1)}M followers
-          </p>
+      )}
+
+      <button
+        onClick={handleToggleLike}
+        disabled={pending}
+        aria-label={liked ? "Unlike artist" : "Like artist"}
+        className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all duration-150 ${
+          liked
+            ? "bg-fuchsia-600/90 border-fuchsia-500 text-white"
+            : "bg-black/40 border-white/10 text-white/80 hover:text-white hover:bg-black/60"
+        } ${pending ? "opacity-60 cursor-not-allowed" : ""}`}
+      >
+        {pending ? (
+          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <HeartIcon filled={liked} className="w-3.5 h-3.5" />
         )}
+      </button>
+
+      <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <PlayIcon className="w-3.5 h-3.5 text-white ml-0.5" />
       </div>
-    </Link>
-  );
+    </div>
+
+    <div>
+      <p className="text-sm font-semibold text-zinc-200 truncate max-w-[120px]">{artist.name}</p>
+      <p className="text-xs text-zinc-500 mt-0.5">{formatCount(likeCount)} followers</p>
+    </div>
+  </Link>
+);
 }
 
 // ─── Skeleton Card ────────────────────────────────────────────────────────────
@@ -243,13 +414,17 @@ function PlaylistCard({ playlist }: { playlist: (typeof PLAYLISTS)[0] }) {
 
 // ─── Home Page ────────────────────────────────────────────────────────────────
 
-export default function HomePage() {
+export default function HomePage({ songs }: { songs: ISong[] }) {
   const [artists, setArtists] = useState<IArtist[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
   const [activeGenre, setActiveGenre] = useState("All");
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const { data: session } = useSession();
   const router = useRouter();
+  const { toast, showToast } = useToast();
+
+  const token = (session?.user as any)?.token || (session as any)?.accessToken;
+  const isAuthenticated = !!session && !!token;
 
   useEffect(() => {
     const fetchArtists = async () => {
@@ -265,15 +440,22 @@ export default function HomePage() {
         }
       } catch (err: any) {
         console.error(err);
+        showToast("Couldn't load artists. Please refresh.", "error");
       } finally {
         setLoadingArtists(false);
       }
     };
     fetchArtists();
-  }, []);
+  }, [showToast]);
+
+  const handleAuthRequired = useCallback(() => {
+    router.push("/login");
+  }, [router]);
 
   return (
     <main className="min-h-screen bg-[#09090b] text-zinc-100 font-sans antialiased selection:bg-violet-500/30">
+
+      <ToastViewport toast={toast} />
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#09090b]/80 border-b border-zinc-900 px-4 sm:px-8">
@@ -287,7 +469,6 @@ export default function HomePage() {
             <span className="font-bold text-[17px] tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
               Melodex
             </span>
-           
           </div>
 
           {/* Nav */}
@@ -334,7 +515,7 @@ export default function HomePage() {
               </div>
             ) : (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger>
                   <button className="flex items-center gap-2.5 bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-800 p-1.5 pr-3 rounded-xl transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-zinc-700">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center font-bold text-white text-xs">
                       {session.user?.userName?.charAt(0).toUpperCase()}
@@ -343,7 +524,6 @@ export default function HomePage() {
                       <span className="text-xs font-semibold text-zinc-200 leading-none">
                         {session.user?.firstName}
                       </span>
-                    
                     </div>
                   </button>
                 </DropdownMenuTrigger>
@@ -406,7 +586,6 @@ export default function HomePage() {
 
         {/* ── Hero Banner ── */}
         <section className="relative overflow-hidden rounded-3xl border border-zinc-800/50 bg-zinc-950 p-8 sm:p-10">
-          {/* Ambient glow */}
           <div className="pointer-events-none absolute -top-20 -right-20 w-96 h-96 rounded-full bg-violet-600/10 blur-[100px]" />
           <div className="pointer-events-none absolute bottom-0 left-40 w-72 h-72 rounded-full bg-fuchsia-600/8 blur-[80px]" />
 
@@ -417,7 +596,7 @@ export default function HomePage() {
               </p>
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-[1.15] mb-4">
                 The sound of{" "}
-                <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
                   tomorrow, today.
                 </span>
               </h1>
@@ -426,7 +605,7 @@ export default function HomePage() {
                 your taste. Stream 90M+ songs in lossless quality.
               </p>
               <div className="flex items-center gap-3 flex-wrap">
-                <button className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all duration-150">
+                <button className="flex items-center gap-2 bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all duration-150">
                   <PlayIcon className="w-4 h-4" />
                   Start listening free
                 </button>
@@ -523,7 +702,14 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">
               {artists.slice(0, 12).map((artist) => (
-                <ArtistCard key={artist._id} artist={artist} />
+                <ArtistCard
+                  key={artist._id}
+                  artist={artist}
+                  token={token}
+                  isAuthenticated={isAuthenticated}
+                  onAuthRequired={handleAuthRequired}
+                  onError={(msg) => showToast(msg, "error")}
+                />
               ))}
             </div>
           )}

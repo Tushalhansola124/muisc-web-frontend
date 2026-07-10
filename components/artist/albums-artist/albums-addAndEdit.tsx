@@ -59,6 +59,7 @@ export default function AlbumFormForArtist({ albumId, isEdit = false }: AlbumFor
         const fetchArtists = async () => {
             try {
                 const res = await GetOwnArtist();
+                console.log("Fetched artist:", res.data);  
 
                 if (res?.data) {
                     setArtist(res.data);

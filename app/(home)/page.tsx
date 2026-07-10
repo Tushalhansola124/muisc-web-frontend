@@ -17,5 +17,5 @@ export default async function Page() {
     console.error("Songs fetch failed:", err);
   }
 
-  return <HomePage />;
+  return <HomePage songs={songs} />;
 }

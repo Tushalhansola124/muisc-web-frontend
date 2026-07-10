@@ -146,40 +146,36 @@ export const CreateSong = async (
 // ======================================================
 
 export const GetSongById = async (
+  token: string,
   id: string,
-  token:string,
 ): Promise<ISingleSongResponse> => {
-
   try {
-
     const response = await axiosInstance.get(
       `${API_ENDPOINTS.song.getById}${id}`,
       {
-  
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
-    )
-    // console.log("GET SONG BY ID RESPONSE:", response.data)
-    return response.data
+    );
 
+    return response.data;
   } catch (error: any) {
-
-    console.log("GET SONG BY ID ERROR:", error)
+    console.log("GET SONG BY ID ERROR:", error.response?.data);
 
     if (error.response?.status === 404) {
-      throw new Error("Song not found")
+      throw new Error("Song not found");
     }
 
     if (error.response?.status === 401) {
-      throw new Error(
-        "Session expired. Please login again."
-      )
+      throw new Error("Session expired. Please login again.");
     }
 
     throw new Error(
       error?.response?.data?.message ||
       error?.message ||
       "Failed To Fetch Song"
-    )
+    );
   }
 }
 

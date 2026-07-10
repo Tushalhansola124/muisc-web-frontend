@@ -86,6 +86,7 @@ export default function PlaylistForm() {
         songs: data.songs || []
       }
 
+      // const res = await CreatePlaylist(payload)
       const res = await CreatePlaylist(payload)
 
       if (res.success || res.status === 200 || res.status === 201) {

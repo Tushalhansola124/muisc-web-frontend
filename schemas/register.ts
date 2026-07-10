@@ -27,7 +27,8 @@ export const registerSchema = z.object({
     .string()
     .min(6, "Password must be at least 6 characters"),
 
- role: z.string().default("user"),
+//  role: z.string().default("user"),
+role: z.enum(["user", "artist", "admin"]),
 });
 
 export type RegisterSchemaType = z.infer<

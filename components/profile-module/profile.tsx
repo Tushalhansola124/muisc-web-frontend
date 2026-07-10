@@ -116,7 +116,7 @@ export default function ProfilePage() {
               <h2 className="text-2xl font-semibold mt-6">
                 {session?.user?.firstName} {session?.user?.lastName}
               </h2>
-              <p className="text-muted-foreground">@{session?.user?.userName || session?.user?.username}</p>
+              <p className="text-muted-foreground">@{session?.user?.userName}</p>
 
               <Badge variant="secondary" className="mt-3">
                 {session?.user?.role?.toUpperCase()}

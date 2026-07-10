@@ -16,7 +16,10 @@ export const API_ENDPOINTS = {
     update:"/api/artist/artistupdate/",
     delete:"/api/artist/artistDelete/",
     getById:"/api/artist/getArtistById/",
-    getOwnArtist:"/api/artist/my-artist"
+    getOwnArtist:"/api/artist/my-artist",
+    likeArtist:"/api/user/follow/",
+    unlikeArtist:"/api/user/unfollow/",
+    isLikeArtist:"/api/user/is-following/"
   },
   genre:{
     get:"/api/genre/getall",
