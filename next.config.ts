@@ -13,6 +13,7 @@ const nextConfig = {
       sizeLimit: "100mb",
     },
   },
+  allowedDevOrigins: ["10.94.132.178"],
 
 }
 

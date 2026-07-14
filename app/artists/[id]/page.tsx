@@ -29,9 +29,12 @@ export default async function Page({ params }: PageProps) {
   }
 
   return (
-    <MusicHomePage
+   <>
+     <MusicHomePage
 
       songs={songs}
     />
+    
+   </>
   );
 }

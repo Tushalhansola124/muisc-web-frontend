@@ -147,25 +147,18 @@ export default function MusicHomePage({ songs }: Props) {
 
   // ── Derive visible songs ──────────────────────────────────
   const activePlaylist = playlists.find((p) => p._id === activePlaylistId) ?? null;
-  const visibleSongs: ISong[] = activePlaylist
-    ? getPlaylistSongs(activePlaylist.songs as PlaylistSong[], songs)
-    : songs;
+const visibleSongs: ISong[] = activePlaylist
+  ? getPlaylistSongs(activePlaylist.songs as PlaylistSong[], songs)
+  : songs;
+const currentSong = visibleSongs.find((s) => s._id === activeSongId) ?? visibleSongs[0];
+const currentIndex = visibleSongs.findIndex((s) => s._id === activeSongId);
+const currentColor = currentSong ? COLORS[visibleSongs.indexOf(currentSong) % COLORS.length] : "#2a9d8f";
+const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
-  const currentSong = songs.find((s) => s._id === activeSongId) ?? songs[0];
-  const currentIndex = visibleSongs.findIndex((s) => s._id === activeSongId);
-  const currentColor = currentSong ? COLORS[songs.indexOf(currentSong) % COLORS.length] : "#2a9d8f";
-  const safeIndex = currentIndex === -1 ? 0 : currentIndex;
-
-  // ── Audio effects ─────────────────────────────────────────
-  // NOTE: This effect is kept as a fallback/sync mechanism for cases where
-  // activeSongId changes from somewhere other than playSong() (e.g. external
-  // state changes). The primary, reliable playback trigger now happens
-  // directly and synchronously inside playSong() itself — see below.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentSong?.audioUrl) return;
-    // Avoid re-loading/re-triggering if the src is already correct
-    // (playSong already set it directly, so this becomes a no-op in that case).
+
     const alreadyCorrectSrc =
       audio.src && audio.src.endsWith(currentSong.audioUrl);
     if (!alreadyCorrectSrc) {
@@ -215,42 +208,46 @@ export default function MusicHomePage({ songs }: Props) {
     };
   }, [safeIndex, visibleSongs]); // eslint-disable-line
 
+
+
   // ── Playback handlers ─────────────────────────────────────
-  // ✅ FIX: playSong now takes the full song object (not just an id) and
-  // sets audio.src / plays it IMMEDIATELY and synchronously on click,
-  // instead of relying solely on the `activeSongId` useEffect to catch up
-  // on the next render. Previously, clicking the 2nd (or any non-active)
-  // song only updated state, and the effect that actually swapped
-  // audio.src could race with the *previous* song's play() call / lag a
-  // render behind — resulting in the first song continuing to play.
-  const playSong = (song: ISong) => {
-    const audio = audioRef.current;
+const playSong = (song: ISong) => {
+  const audio = audioRef.current;
+  if (!song?.audioUrl) return;
 
-    // Same song clicked again → just toggle play/pause
-    if (song._id === activeSongId) {
-      setIsPlaying((p) => !p);
-      return;
-    }
+  // Same song clicked → toggle play/pause
+  if (song._id === activeSongId) {
+    setIsPlaying((p) => !p);
+    return;
+  }
 
-    setActiveSongId(song._id);
-    setIsPlaying(true);
-    setProgress(0);
-    setCurrentTime(0);
+  setActiveSongId(song._id);
+  setIsPlaying(true);
+  setProgress(0);
+  setCurrentTime(0);
 
-    if (audio && song.audioUrl) {
-      audio.src = song.audioUrl;
-      audio.load();
-      audio.volume = volume / 100;
-      audio.play().catch(console.error);
-    }
-  };
+  if (audio) {
+    audio.src = song.audioUrl;
+    audio.load();
+    audio.volume = volume / 100;
+    audio.play().catch(console.error);
+  }
+};
 
-  const playPrev = () => {
-    if (safeIndex > 0) playSong(visibleSongs[safeIndex - 1]);
-  };
-  const playNext = () => {
-    if (safeIndex < visibleSongs.length - 1) playSong(visibleSongs[safeIndex + 1]);
-  };
+const playNext = () => {
+  if (!visibleSongs.length) return;
+  const currentIndex = visibleSongs.findIndex(s => s._id === activeSongId);
+  const nextIndex = (currentIndex + 1) % visibleSongs.length;
+  playSong(visibleSongs[nextIndex]);
+};
+
+const playPrev = () => {
+  if (!visibleSongs.length) return;
+  const currentIndex = visibleSongs.findIndex(s => s._id === activeSongId);
+  const prevIndex = currentIndex === 0 ? visibleSongs.length - 1 : currentIndex - 1;
+  playSong(visibleSongs[prevIndex]);
+};
+
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setProgress(val);
