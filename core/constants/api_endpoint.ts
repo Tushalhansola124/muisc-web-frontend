@@ -45,7 +45,8 @@ export const API_ENDPOINTS = {
     likeSong: "/api/likeSong/like/",
     unlikeSong:"/api/likeSong/unlike/",
     isLikeSong:"/api/likeSong/is-liked/",
-    getByArtist:"/api/song/songs/"
+    getByArtist:"/api/song/songs/",
+    play:"/api/song/play/"
 
   },
   playlist:{

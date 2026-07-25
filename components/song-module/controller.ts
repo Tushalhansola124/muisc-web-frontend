@@ -141,6 +141,32 @@ export const CreateSong = async (
   }
 }
 
+export const PlaySong = async (songId: string, token?: string) => {
+  try {
+    const response = await axios.post(
+      `${SERVER_URL}${API_ENDPOINTS.song.play}${songId}`,
+      {},
+      {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log("PLAY SONG ERROR:", error);
+
+    throw new Error(
+      error?.response?.data?.message ||
+      error?.message ||
+      "Play Song Failed"
+    );
+  }
+};
+
 // ======================================================
 // GET SONG BY ID
 // ======================================================
