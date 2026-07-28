@@ -790,7 +790,7 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
                   <DropdownMenuSeparator className="bg-zinc-800/60 my-1" />
 
                   <DropdownMenuItem
-                    onClick={() => signOut({ callbackUrl: "/" })}
+                    onClick={() => signOut({ callbackUrl: "/login" })}
                     className="px-3 py-2 text-sm rounded-lg text-red-400 font-medium focus:bg-red-950/30 focus:text-red-300 cursor-pointer"
                   >
                     Sign Out
