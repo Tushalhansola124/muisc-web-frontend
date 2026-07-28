@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { GetArtists } from "@/components/artist-module/controller";
 import { LikeArtist, UnLikeArtist, isLikeSong } from "@/components/artist-module/like-contoller";
+import { searchSongs } from "@/components/song-module/controller";
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import TrendingSong from "@/components/song-module/trending-Song";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ interface ISong {
   artist?: IArtist | string;
   duration?: number;
   coverImage?: string;
+  thumbnail?: string;
   plays?: number;
   createdAt?: string;
 }
@@ -89,6 +92,23 @@ function SpinnerIcon({ className }: { className?: string }) {
   );
 }
 
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ─── Toast (lightweight, no external dep) ──────────────────────────────────────
 
 function useToast() {
@@ -128,6 +148,259 @@ function ToastViewport({ toast }: { toast: { message: string; type: "error" | "s
         )}
         {toast.message}
       </div>
+    </div>
+  );
+}
+
+// ─── Song Search (dropdown of matching songs → click navigates to track page) ─
+
+function getSongArtistName(artist: ISong["artist"]) {
+  if (typeof artist === "string") return artist;
+  return artist?.name ?? "Unknown";
+}
+
+function getSongThumb(song: ISong) {
+  return song.thumbnail || song.coverImage || "";
+}
+
+function formatSongDuration(seconds?: number) {
+  if (seconds == null) return "";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// Backend response shapes can vary a lot ({songs:[...]}, {data:[...]},
+// {data:{songs:[...]}}, or a bare array). Try every reasonable shape instead
+// of assuming one, so a mismatched key doesn't silently show an empty list.
+function extractSongsFromResponse(res: any): ISong[] {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res.songs)) return res.songs;
+  if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res.data?.songs)) return res.data.songs;
+  if (Array.isArray(res.data?.data)) return res.data.data;
+  if (Array.isArray(res.results)) return res.results;
+  return [];
+}
+
+function SongSearchResults({
+  results,
+  loading,
+  query,
+  errorMsg,
+  onSelect,
+}: {
+  results: ISong[];
+  loading: boolean;
+  query: string;
+  errorMsg: string | null;
+  onSelect: (song: ISong) => void;
+}) {
+  return (
+    <div className="absolute top-full mt-2 left-0 right-0 bg-[#0f0f12] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50 max-h-80 overflow-y-auto">
+      {loading && (
+        <div className="px-4 py-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
+          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+          Searching…
+        </div>
+      )}
+
+      {!loading && errorMsg && (
+        <div className="px-4 py-6 text-center text-xs text-red-400">{errorMsg}</div>
+      )}
+
+      {!loading && !errorMsg && results.length === 0 && (
+        <div className="px-4 py-6 text-center text-xs text-zinc-500">
+          No songs found for &ldquo;{query}&rdquo;.
+        </div>
+      )}
+
+      {!loading &&
+        !errorMsg &&
+        results.map((song) => (
+          <button
+            key={song._id}
+            onClick={() => onSelect(song)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-900 transition-colors text-left"
+          >
+            <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-gradient-to-br from-violet-800 to-fuchsia-800">
+              {getSongThumb(song) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={getSongThumb(song)} alt={song.title} className="w-full h-full object-cover" />
+              ) : (
+                <MusicIcon className="w-4 h-4 text-white/70" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-zinc-200 truncate">{song.title}</p>
+              <p className="text-xs text-zinc-500 truncate">{getSongArtistName(song.artist)}</p>
+            </div>
+            {song.duration != null && (
+              <span className="text-[10px] text-zinc-600 font-mono shrink-0">
+                {formatSongDuration(song.duration)}
+              </span>
+            )}
+          </button>
+        ))}
+    </div>
+  );
+}
+
+function SearchBar({
+  className = "",
+  autoFocus = false,
+  token,
+}: {
+  className?: string;
+  autoFocus?: boolean;
+  token?: string;
+}) {
+  const router = useRouter();
+
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ISong[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Debounced search
+  useEffect(() => {
+    const trimmed = query.trim();
+
+    if (!trimmed) {
+      setResults([]);
+      setErrorMsg(null);
+      setOpen(false);
+      setLoading(false);
+      return;
+    }
+
+    if (!token) {
+      setErrorMsg("Please login to search songs.");
+      setResults([]);
+      setOpen(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res: any = await searchSongs(token, trimmed, 8);
+
+        // eslint-disable-next-line no-console
+        console.log("searchSongs raw response:", res);
+
+        // searchSongs() catches its own axios errors and resolves with
+        // { success:false, songs:[], message } instead of throwing — so a
+        // failed request looks like an empty list unless we check `success`.
+        if (res?.success === false) {
+          setResults([]);
+          setErrorMsg(res?.message || "No songs found.");
+          setOpen(true);
+          return;
+        }
+
+        const list = extractSongsFromResponse(res);
+        // eslint-disable-next-line no-console
+        console.log("extracted song list:", list);
+
+        setResults(list);
+        setErrorMsg(null);
+        setOpen(true);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setResults([]);
+        setErrorMsg("Couldn't search right now.");
+        setOpen(true);
+      } finally {
+        setLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [query, token]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+
+    const close = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const goToSong = (song: ISong) => {
+    setOpen(false);
+    setQuery("");
+    setResults([]);
+    setErrorMsg(null);
+    router.push(`/track/${song._id}`);
+  };
+
+  const clearSearch = () => {
+    setQuery("");
+    setResults([]);
+    setErrorMsg(null);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={wrapperRef} className={`relative ${className}`}>
+      <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 focus-within:border-violet-600/60 transition-colors">
+        <SearchIcon className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+
+        <input
+          autoFocus={autoFocus}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => {
+            if (results.length) setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              (e.target as HTMLInputElement).blur();
+              setOpen(false);
+            }
+            if (e.key === "Enter" && results.length > 0) {
+              goToSong(results[0]);
+            }
+          }}
+          placeholder="Search artists, songs…"
+          className="bg-transparent outline-none text-xs text-zinc-200 placeholder:text-zinc-500 w-full"
+        />
+
+        {loading && <SpinnerIcon className="w-3.5 h-3.5 text-zinc-500 animate-spin shrink-0" />}
+
+        {!loading && query && (
+          <button
+            onClick={clearSearch}
+            aria-label="Clear search"
+            className="text-zinc-500 hover:text-white shrink-0"
+          >
+            <CloseIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <SongSearchResults
+          results={results}
+          loading={loading}
+          query={query}
+          errorMsg={errorMsg}
+          onSelect={goToSong}
+        />
+      )}
     </div>
   );
 }
@@ -319,62 +592,6 @@ function GenreChips({
   );
 }
 
-// ─── Trending Song Row ────────────────────────────────────────────────────────
-
-const TRENDING_SONGS = [
-  { num: 1, title: "Gravity Wells", artist: "Nova Pulse", plays: "3.2M", dur: "4:58", hot: true },
-  { num: 2, title: "Neon Rain", artist: "Mara Ellis", plays: "2.8M", dur: "3:41", hot: false },
-  { num: 3, title: "Static Haze", artist: "The Static", plays: "2.5M", dur: "5:12", hot: false },
-  { num: 4, title: "Gold Rush", artist: "Drift King", plays: "2.1M", dur: "3:28", hot: true },
-  { num: 5, title: "Softcore", artist: "Luxa", plays: "1.9M", dur: "4:02", hot: false },
-  { num: 6, title: "Blue Void", artist: "Vex Coral", plays: "1.7M", dur: "3:55", hot: false },
-];
-
-function TrendingSongRow({
-  song,
-  index,
-  isPlaying,
-  onClick,
-}: {
-  song: (typeof TRENDING_SONGS)[0];
-  index: number;
-  isPlaying: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className={`group grid grid-cols-[40px_1fr_160px_100px_80px] gap-0 px-5 py-3 cursor-pointer transition-colors duration-150 border-b border-zinc-900 last:border-0 ${
-        isPlaying ? "bg-violet-950/20" : "hover:bg-zinc-900/50"
-      }`}
-    >
-      <span className="flex items-center text-sm text-zinc-500">
-        {isPlaying ? (
-          <span className="text-violet-400 text-xs">▶</span>
-        ) : (
-          song.num
-        )}
-      </span>
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-800 to-fuchsia-800 shrink-0" />
-        <div>
-          <p className={`text-sm font-semibold ${isPlaying ? "text-violet-400" : "text-zinc-200"}`}>
-            {song.title}
-            {song.hot && (
-              <span className="ml-2 text-[9px] font-bold uppercase tracking-wide bg-red-600 text-white px-1.5 py-0.5 rounded">
-                Hot
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
-      <span className="flex items-center text-sm text-zinc-400">{song.artist}</span>
-      <span className="flex items-center text-sm text-zinc-500">{song.plays}</span>
-      <span className="flex items-center justify-end text-sm text-zinc-500">{song.dur}</span>
-    </div>
-  );
-}
-
 // ─── Playlist Card ────────────────────────────────────────────────────────────
 
 const PLAYLISTS = [
@@ -418,7 +635,7 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
   const [artists, setArtists] = useState<IArtist[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
   const [activeGenre, setActiveGenre] = useState("All");
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const { data: session } = useSession();
   const router = useRouter();
   const { toast, showToast } = useToast();
@@ -489,13 +706,17 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
 
           {/* Search + Auth */}
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 w-52">
-              <svg className="w-3.5 h-3.5 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-              </svg>
-              <span className="text-xs text-zinc-500">Search artists, songs…</span>
-            </div>
+            {/* Desktop search with live dropdown */}
+            <SearchBar className="hidden sm:block w-56 lg:w-64" token={token} />
+
+            {/* Mobile search toggle */}
+            <button
+              onClick={() => setMobileSearchOpen((p) => !p)}
+              aria-label="Search"
+              className="sm:hidden w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+            >
+              {mobileSearchOpen ? <CloseIcon className="w-4 h-4" /> : <SearchIcon className="w-4 h-4" />}
+            </button>
 
             {/* Auth */}
             {!session ? (
@@ -579,6 +800,13 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
             )}
           </div>
         </div>
+
+        {/* Mobile search overlay row */}
+        {mobileSearchOpen && (
+          <div className="sm:hidden max-w-7xl mx-auto pb-3">
+            <SearchBar className="w-full" autoFocus token={token} />
+          </div>
+        )}
       </header>
 
       {/* ── Main Content ── */}
@@ -718,30 +946,7 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
         {/* ── Trending Now ── */}
         <section>
           <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-bold tracking-tight text-zinc-100">Trending Now</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">Chart-climbing tracks across all genres</p>
-            </div>
-          </div>
-
-          <div className="bg-zinc-950 border border-zinc-800/60 rounded-2xl overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-[40px_1fr_160px_100px_80px] gap-0 px-5 py-2.5 border-b border-zinc-900">
-              <span className="text-[11px] text-zinc-600">#</span>
-              <span className="text-[11px] text-zinc-600">Title</span>
-              <span className="text-[11px] text-zinc-600">Artist</span>
-              <span className="text-[11px] text-zinc-600">Plays</span>
-              <span className="text-[11px] text-zinc-600 text-right">Duration</span>
-            </div>
-            {TRENDING_SONGS.map((song, i) => (
-              <TrendingSongRow
-                key={song.num}
-                song={song}
-                index={i}
-                isPlaying={playingIndex === i}
-                onClick={() => setPlayingIndex(playingIndex === i ? null : i)}
-              />
-            ))}
+            <TrendingSong/>
           </div>
         </section>
 

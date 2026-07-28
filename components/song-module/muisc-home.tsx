@@ -9,14 +9,14 @@
 //   AddSongToPlaylist,
 //   RemoveSongFromPlaylist,
 // } from "@/components/playlist-module/controller";
+// import { PlaySong } from "@/components/song-module/controller"; // play-count API
 // import { useSession } from "next-auth/react";
 // import Link from "next/link";
 // import React, { useRef, useState, useEffect, useCallback } from "react";
 // import { toast } from "sonner";
 
-
 // interface Props {
-//   songs: ISong[]   // ← Added this
+//   songs: ISong[];
 // }
 
 // // ─── Types ───────────────────────────────────────────────────
@@ -66,16 +66,22 @@
 //   return (playlist.songs ?? []).some((s) => getSongId(s as PlaylistSong) === songId);
 // }
 
+// function getDisplayPlays(song: ISong, playCounts: Record<string, number>) {
+//   return playCounts[song._id] ?? song.plays ?? 0;
+// }
+
+// function formatPlays(p: number) {
+//   if (p >= 1_000_000) return `${(p / 1_000_000).toFixed(1)}M`;
+//   if (p >= 1_000) return `${(p / 1_000).toFixed(1)}K`;
+//   return String(p);
+// }
+
 // const COLORS = [
 //   "#e63946", "#f4a261", "#2a9d8f", "#8338ec",
 //   "#06d6a0", "#ffb703", "#fb5607", "#3a86ff",
 //   "#ff006e", "#8ecae6",
 // ];
 // const PLAYLIST_ICONS = ["♪", "🌊", "🌙", "🔥", "☀️", "🎯", "📼", "✨", "🎧", "💫"];
-
-// interface Props {
-//   songs: ISong[];
-// }
 
 // export default function MusicHomePage({ songs }: Props) {
 //   const [activeSongId, setActiveSongId] = useState<string | null>(songs?.[0]?._id ?? null);
@@ -86,6 +92,9 @@
 //   const [currentTime, setCurrentTime] = useState(0);
 //   const [duration, setDuration] = useState(0);
 //   const { data: session } = useSession();
+
+ 
+//   const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
 
 //   // ── Playlists ─────────────────────────────────────────────
 //   const [playlists, setPlaylists] = useState<IPlaylist[]>([]);
@@ -109,6 +118,8 @@
 //   const [sidebarOpen, setSidebarOpen] = useState(false);
 
 //   const audioRef = useRef<HTMLAudioElement>(null);
+ 
+//   const playedSongsRef = useRef<Set<string>>(new Set());
 
 //   // ── Fetch playlists ───────────────────────────────────────
 //   const loadPlaylists = useCallback(async () => {
@@ -147,13 +158,13 @@
 
 //   // ── Derive visible songs ──────────────────────────────────
 //   const activePlaylist = playlists.find((p) => p._id === activePlaylistId) ?? null;
-// const visibleSongs: ISong[] = activePlaylist
-//   ? getPlaylistSongs(activePlaylist.songs as PlaylistSong[], songs)
-//   : songs;
-// const currentSong = visibleSongs.find((s) => s._id === activeSongId) ?? visibleSongs[0];
-// const currentIndex = visibleSongs.findIndex((s) => s._id === activeSongId);
-// const currentColor = currentSong ? COLORS[visibleSongs.indexOf(currentSong) % COLORS.length] : "#2a9d8f";
-// const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+//   const visibleSongs: ISong[] = activePlaylist
+//     ? getPlaylistSongs(activePlaylist.songs as PlaylistSong[], songs)
+//     : songs;
+//   const currentSong = visibleSongs.find((s) => s._id === activeSongId) ?? visibleSongs[0];
+//   const currentIndex = visibleSongs.findIndex((s) => s._id === activeSongId);
+//   const currentColor = currentSong ? COLORS[visibleSongs.indexOf(currentSong) % COLORS.length] : "#2a9d8f";
+//   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
 //   useEffect(() => {
 //     const audio = audioRef.current;
@@ -183,6 +194,7 @@
 //   useEffect(() => {
 //     const audio = audioRef.current;
 //     if (!audio) return;
+
 //     const onTimeUpdate = () => {
 //       setCurrentTime(audio.currentTime);
 //       if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100);
@@ -206,47 +218,80 @@
 //       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
 //       audio.removeEventListener("ended", onEnded);
 //     };
-//   }, [safeIndex, visibleSongs]); // eslint-disable-line
+//   }, [safeIndex, visibleSongs, activeSongId]); // eslint-disable-line
+
+//   // ── Register a play with the backend (used by playSong below) ─────
+//   const registerPlay = async (song: ISong) => {
+//     playedSongsRef.current.add(song._id);
+//     try {
+//       const res = await PlaySong(song._id, session?.user?.token || "");
+//       if (res?.success) {
+
+//         const updatedPlays =
+//           res?.data?.plays ?? res?.totalPlays ?? ((playCounts[song._id] ?? song.plays ?? 0) + 1);
+//         setPlayCounts((prev) => ({ ...prev, [song._id]: updatedPlays }));
+//         toast.success(`Play count updated for: ${song.title}`);
+//       } else {
+//         toast.error(res?.message || `Play count update failed for: ${song.title}`);
+//         // registration failed server-side → allow a retry on next play
+//         playedSongsRef.current.delete(song._id);
+//       }
+//     } catch (err) {
+//       console.error("Play API failed:", err);
+//       // Don't block playback if the API call fails, but allow a retry
+//       playedSongsRef.current.delete(song._id);
+//     }
+//   };
+
+//   // ── Playback handler (single source of truth for play counting) ───
+//   const playSong = async (song: ISong) => {
+//     if (!song?._id) return;
+
+//     const audio = audioRef.current;
+//     const isSameSong = song._id === activeSongId;
+
+//     if (isSameSong) {
+//       // Toggle play/pause for the currently loaded song.
+//       const willPlay = !isPlaying;
+//       setIsPlaying(willPlay);
+
+     
+//       if (willPlay && !playedSongsRef.current.has(song._id)) {
+//         registerPlay(song);
+//       }
+//       return;
+//     }
+
+//     // ── New song selected → this is a genuine play, update UI immediately ──
+//     setActiveSongId(song._id);
+//     setIsPlaying(true);
+//     setProgress(0);
+//     setCurrentTime(0);
+
+//     if (audio && song.audioUrl) {
+//       audio.src = song.audioUrl;
+//       audio.load();
+//       audio.volume = volume / 100;
+//       audio.play().catch(console.error);
+//     }
+
+//     registerPlay(song);
+//   };
 
 
+//   const playNext = () => {
+//     if (!visibleSongs.length) return;
+//     const currentIndex = visibleSongs.findIndex(s => s._id === activeSongId);
+//     const nextIndex = (currentIndex + 1) % visibleSongs.length;
+//     playSong(visibleSongs[nextIndex]);
+//   };
 
-//   // ── Playback handlers ─────────────────────────────────────
-// const playSong = (song: ISong) => {
-//   const audio = audioRef.current;
-//   if (!song?.audioUrl) return;
-
-//   // Same song clicked → toggle play/pause
-//   if (song._id === activeSongId) {
-//     setIsPlaying((p) => !p);
-//     return;
-//   }
-
-//   setActiveSongId(song._id);
-//   setIsPlaying(true);
-//   setProgress(0);
-//   setCurrentTime(0);
-
-//   if (audio) {
-//     audio.src = song.audioUrl;
-//     audio.load();
-//     audio.volume = volume / 100;
-//     audio.play().catch(console.error);
-//   }
-// };
-
-// const playNext = () => {
-//   if (!visibleSongs.length) return;
-//   const currentIndex = visibleSongs.findIndex(s => s._id === activeSongId);
-//   const nextIndex = (currentIndex + 1) % visibleSongs.length;
-//   playSong(visibleSongs[nextIndex]);
-// };
-
-// const playPrev = () => {
-//   if (!visibleSongs.length) return;
-//   const currentIndex = visibleSongs.findIndex(s => s._id === activeSongId);
-//   const prevIndex = currentIndex === 0 ? visibleSongs.length - 1 : currentIndex - 1;
-//   playSong(visibleSongs[prevIndex]);
-// };
+//   const playPrev = () => {
+//     if (!visibleSongs.length) return;
+//     const currentIndex = visibleSongs.findIndex(s => s._id === activeSongId);
+//     const prevIndex = currentIndex === 0 ? visibleSongs.length - 1 : currentIndex - 1;
+//     playSong(visibleSongs[prevIndex]);
+//   };
 
 //   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 //     const val = Number(e.target.value);
@@ -555,7 +600,7 @@
 
 //                         <div className="col-album text-sm text-zinc-500 truncate">{getAlbumTitle(song.album)}</div>
 //                         <div className="col-plays text-sm text-zinc-500 text-right font-mono">
-//                           {song.plays >= 1_000_000 ? `${(song.plays / 1_000_000).toFixed(1)}M` : song.plays >= 1_000 ? `${(song.plays / 1_000).toFixed(1)}K` : song.plays}
+//                           {formatPlays(getDisplayPlays(song, playCounts))}
 //                         </div>
 
 //                         <div className="flex items-center justify-end gap-1.5">
@@ -865,6 +910,8 @@
 //     </div>
 //   );
 // }
+
+
 "use client";
 import { ISong } from "@/components/song-module/controller";
 import {
@@ -876,9 +923,10 @@ import {
   AddSongToPlaylist,
   RemoveSongFromPlaylist,
 } from "@/components/playlist-module/controller";
-import { PlaySong } from "@/components/song-module/controller"; // play-count API
+import { PlaySong, GetTrendingSongs } from "@/components/song-module/controller"; // play-count + trending API
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -933,9 +981,6 @@ function isSongInPlaylist(playlist: IPlaylist, songId: string): boolean {
   return (playlist.songs ?? []).some((s) => getSongId(s as PlaylistSong) === songId);
 }
 
-// Show the latest known play count for a song: if we've received a fresh
-// count from the server (after this session played it), use that absolute
-// value; otherwise fall back to the count that came with the song data.
 function getDisplayPlays(song: ISong, playCounts: Record<string, number>) {
   return playCounts[song._id] ?? song.plays ?? 0;
 }
@@ -944,6 +989,15 @@ function formatPlays(p: number) {
   if (p >= 1_000_000) return `${(p / 1_000_000).toFixed(1)}M`;
   if (p >= 1_000) return `${(p / 1_000).toFixed(1)}K`;
   return String(p);
+}
+
+// Resolve a stable color for a song: prefer its position in the full library
+// (so colors stay consistent everywhere), fall back to a local index so
+// songs that only exist in a secondary list (e.g. trending) still get a color.
+function colorForSong(song: ISong | null | undefined, library: ISong[], fallbackIdx: number) {
+  if (!song) return COLORS[fallbackIdx % COLORS.length];
+  const i = library.findIndex((s) => s._id === song._id);
+  return COLORS[(i === -1 ? fallbackIdx : i) % COLORS.length];
 }
 
 const COLORS = [
@@ -963,16 +1017,23 @@ export default function MusicHomePage({ songs }: Props) {
   const [duration, setDuration] = useState(0);
   const { data: session } = useSession();
 
-  // ── Play-count tracking ───────────────────────────────────
-  // playCounts holds ONLY the optimistic local bump added whenever the
-  // PlaySong API succeeds inside playSong(). This is the single source of
-  // truth for counting plays — nothing else in this file calls PlaySong.
+  // Trending Now should only show on the real Home Page, never on
+  // artist pages, playlist pages, etc. — this component gets reused there
+  // with a filtered `songs` list, so we gate on the route instead of props.
+  const pathname = usePathname();
+  const isHomePage = pathname === "/";
+
+ 
   const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
 
   // ── Playlists ─────────────────────────────────────────────
   const [playlists, setPlaylists] = useState<IPlaylist[]>([]);
   const [playlistsLoading, setPlaylistsLoading] = useState(true);
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
+
+  // ── Trending ──────────────────────────────────────────────
+  const [trendingSongs, setTrendingSongs] = useState<ISong[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
 
   // ── Song context menu ─────────────────────────────────────
   const [songMenu, setSongMenu] = useState<SongMenuState | null>(null);
@@ -991,11 +1052,12 @@ export default function MusicHomePage({ songs }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  // Songs for which we've already registered a play in this session.
-  // Needed because activeSongId defaults to songs[0] on load, so the FIRST
-  // click on that song looks like "same song → toggle" unless we track this
-  // separately.
+ 
   const playedSongsRef = useRef<Set<string>>(new Set());
+
+  // Briefly highlights a song's Plays value right after its count updates,
+  // so the increment is visible in the Trending card / list row.
+  const [recentlyPlayedId, setRecentlyPlayedId] = useState<string | null>(null);
 
   // ── Fetch playlists ───────────────────────────────────────
   const loadPlaylists = useCallback(async () => {
@@ -1012,6 +1074,27 @@ export default function MusicHomePage({ songs }: Props) {
   }, []);
 
   useEffect(() => { loadPlaylists(); }, [loadPlaylists]);
+
+  // ── Fetch trending songs (home page only) ───────────────────
+  const loadTrending = useCallback(async () => {
+    if (!isHomePage) {
+      setTrendingLoading(false);
+      return;
+    }
+    try {
+      setTrendingLoading(true);
+      // No limit passed → backend returns the full trending list.
+      const res = await GetTrendingSongs(session?.user?.token || "");
+      setTrendingSongs(res?.data ?? []);
+    } catch (err) {
+      console.error("Failed to load trending songs:", err);
+      setTrendingSongs([]);
+    } finally {
+      setTrendingLoading(false);
+    }
+  }, [session?.user?.token, isHomePage]);
+
+  useEffect(() => { loadTrending(); }, [loadTrending]);
 
   // ── Close menu on outside click / scroll ─────────────────
   useEffect(() => {
@@ -1039,7 +1122,7 @@ export default function MusicHomePage({ songs }: Props) {
     : songs;
   const currentSong = visibleSongs.find((s) => s._id === activeSongId) ?? visibleSongs[0];
   const currentIndex = visibleSongs.findIndex((s) => s._id === activeSongId);
-  const currentColor = currentSong ? COLORS[visibleSongs.indexOf(currentSong) % COLORS.length] : "#2a9d8f";
+  const currentColor = colorForSong(currentSong, songs, visibleSongs.indexOf(currentSong as ISong));
   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
   useEffect(() => {
@@ -1067,11 +1150,6 @@ export default function MusicHomePage({ songs }: Props) {
     if (audioRef.current) audioRef.current.volume = volume / 100;
   }, [volume]);
 
-  // ── Audio event listeners: progress, duration, ended ──────
-  // NOTE: play-count registration is NOT done here. It happens exactly once,
-  // inside playSong(), the moment a *new* song is selected. This avoids
-  // double-counting (once here via threshold, once in playSong) and avoids
-  // counting a play every time the user pauses/resumes the same track.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -1102,17 +1180,21 @@ export default function MusicHomePage({ songs }: Props) {
   }, [safeIndex, visibleSongs, activeSongId]); // eslint-disable-line
 
   // ── Register a play with the backend (used by playSong below) ─────
+  // This is what makes the play count go up — for BOTH the main list and
+  // the Trending row, since both call playSong() -> registerPlay().
   const registerPlay = async (song: ISong) => {
     playedSongsRef.current.add(song._id);
     try {
       const res = await PlaySong(song._id, session?.user?.token || "");
       if (res?.success) {
-        // Use the exact count the server returns (data.plays, falling back
-        // to totalPlays) so the UI always matches the real number, even
-        // when other users have played the same song in the meantime.
+
         const updatedPlays =
           res?.data?.plays ?? res?.totalPlays ?? ((playCounts[song._id] ?? song.plays ?? 0) + 1);
         setPlayCounts((prev) => ({ ...prev, [song._id]: updatedPlays }));
+        setRecentlyPlayedId(song._id);
+        setTimeout(() => {
+          setRecentlyPlayedId((cur) => (cur === song._id ? null : cur));
+        }, 1200);
         toast.success(`Play count updated for: ${song.title}`);
       } else {
         toast.error(res?.message || `Play count update failed for: ${song.title}`);
@@ -1138,9 +1220,7 @@ export default function MusicHomePage({ songs }: Props) {
       const willPlay = !isPlaying;
       setIsPlaying(willPlay);
 
-      // Edge case: this song was already "active" (e.g. it's the default
-      // song on page load) but was never actually pressed play on yet →
-      // the very first time it's started, still register a play.
+     
       if (willPlay && !playedSongsRef.current.has(song._id)) {
         registerPlay(song);
       }
@@ -1313,7 +1393,7 @@ export default function MusicHomePage({ songs }: Props) {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
-        ::-webkit-scrollbar{width:4px}
+        ::-webkit-scrollbar{width:4px;height:4px}
         ::-webkit-scrollbar-track{background:transparent}
         ::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
         .song-row:hover .song-index{display:none}
@@ -1331,6 +1411,15 @@ export default function MusicHomePage({ songs }: Props) {
         @keyframes menuIn{from{opacity:0;transform:scale(0.95) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
         .ctx-menu{animation:menuIn 0.15s ease forwards}
         .bottom-player{display:none}
+        .trending-skeleton{animation:trendPulse 1.4s ease-in-out infinite}
+        @keyframes trendPulse{0%,100%{opacity:0.35}50%{opacity:0.7}}
+        @keyframes countFlash{0%{color:#34d399;transform:scale(1.35)}100%{color:inherit;transform:scale(1)}}
+        .count-flash{display:inline-block;animation:countFlash 1.1s ease-out}
+        .trending-row{grid-template-columns:44px 1fr 160px 90px 90px}
+        @media(max-width:767px){
+          .trending-row{grid-template-columns:28px 1fr 70px!important}
+          .trending-row .col-artist,.trending-row .col-duration{display:none}
+        }
         @media(max-width:1023px){
           .bottom-player{display:flex}
           .now-playing-panel{display:none}
@@ -1418,8 +1507,96 @@ export default function MusicHomePage({ songs }: Props) {
             </div>
           </div>
 
-          {/* Song list */}
           <div className="px-4 sm:px-8 py-6 pb-28 lg:pb-6">
+
+            {/* ── TRENDING NOW (home page only) ─────────────── */}
+            {isHomePage && !activePlaylist && (trendingLoading || trendingSongs.length > 0) && (
+              <div className="mb-10">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold text-white">Trending Now</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">Chart-climbing tracks across all genres</p>
+                </div>
+
+                <div className="rounded-2xl border border-white/8 overflow-hidden">
+                  <div className="trending-row grid gap-4 px-5 py-3 text-xs text-zinc-500 uppercase tracking-widest border-b border-white/8 bg-white/[0.02]">
+                    <span>#</span>
+                    <span>Title</span>
+                    <span className="col-artist">Artist</span>
+                    <span className="text-right">Plays</span>
+                    <span className="col-duration text-right">Duration</span>
+                  </div>
+
+                  {trendingLoading && (
+                    <div className="p-4 space-y-3">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div key={i} className="trending-skeleton h-10 rounded-lg bg-white/5" />
+                      ))}
+                    </div>
+                  )}
+
+                  {!trendingLoading && trendingSongs.length === 0 && (
+                    <div className="px-5 py-8 text-center text-xs text-zinc-600">No trending songs yet.</div>
+                  )}
+
+                  {!trendingLoading && trendingSongs.map((song, idx) => {
+                    const isActive = song._id === activeSongId;
+                    const color = colorForSong(song, songs, idx);
+                    const plays = getDisplayPlays(song, playCounts);
+                    const isHot = idx < 2; // top 2 tracks get the HOT badge
+
+                    return (
+                      <div
+                        key={song._id}
+                        onClick={() => playSong(song)}
+                        onContextMenu={(e) => openSongMenu(e, song._id)}
+                        className={`trending-row grid gap-4 px-5 py-3.5 items-center cursor-pointer transition-colors border-b border-white/5 last:border-b-0 select-none ${isActive ? "bg-white/8" : "hover:bg-white/[0.04]"}`}
+                      >
+                        <span className={`text-sm font-mono ${isActive ? "text-emerald-400" : "text-zinc-500"}`}>
+                          {isActive && isPlaying ? (
+                            <span className="flex items-end gap-[2px] h-4">
+                              <span className="bar1 w-[3px] bg-emerald-400 rounded-sm inline-block" />
+                              <span className="bar2 w-[3px] bg-emerald-400 rounded-sm inline-block" />
+                              <span className="bar3 w-[3px] bg-emerald-400 rounded-sm inline-block" />
+                            </span>
+                          ) : idx + 1}
+                        </span>
+
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center"
+                            style={{ background: `${color}33`, border: `1px solid ${color}55` }}
+                          >
+                            {song.thumbnail ? (
+                              <img src={song.thumbnail} alt={song.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <span style={{ color }} className="text-xs">♪</span>
+                            )}
+                          </div>
+                          <span className={`text-sm font-semibold truncate ${isActive ? "text-emerald-400" : "text-white"}`}>
+                            {song.title}
+                          </span>
+                          {isHot && (
+                            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-500 text-white flex-shrink-0">
+                              Hot
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="col-artist text-sm truncate" style={{ color }}>
+                          {getArtistName(song.artist)}
+                        </div>
+                        <div className="text-sm text-zinc-400 text-right font-mono">
+                          <span className={recentlyPlayedId === song._id ? "count-flash" : ""}>{formatPlays(plays)}</span>
+                        </div>
+                        <div className="col-duration text-sm text-zinc-500 text-right font-mono">{formatDuration(song.duration)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Song list */}
             <div className="mb-6 flex items-center gap-3 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-bold">{activePlaylist ? activePlaylist.name : "All Songs"}</h1>
               {activePlaylist?.description && <p className="w-full text-sm text-zinc-500 -mt-2">{activePlaylist.description}</p>}
@@ -1485,7 +1662,9 @@ export default function MusicHomePage({ songs }: Props) {
 
                         <div className="col-album text-sm text-zinc-500 truncate">{getAlbumTitle(song.album)}</div>
                         <div className="col-plays text-sm text-zinc-500 text-right font-mono">
-                          {formatPlays(getDisplayPlays(song, playCounts))}
+                          <span className={recentlyPlayedId === song._id ? "count-flash" : ""}>
+                            {formatPlays(getDisplayPlays(song, playCounts))}
+                          </span>
                         </div>
 
                         <div className="flex items-center justify-end gap-1.5">

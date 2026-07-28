@@ -55,6 +55,13 @@ export interface ISongsResponse {
   data: ISong[]
 }
 
+export interface IAllSongResponse {
+  success: boolean;
+  message: string;
+  status: number;
+  count: number;
+  data: ISong[];
+}
 
 
 export interface ISingleSongResponse {
@@ -204,6 +211,79 @@ export const GetSongById = async (
     );
   }
 }
+
+
+// ======================================================
+// GET TRENDING SONGS
+// ======================================================
+
+export const GetTrendingSongs = async (
+  token: string,
+  limit?: number
+): Promise<IAllSongResponse> => {
+  try {
+    const response = await axiosInstance.get(
+      `${API_ENDPOINTS.song.treandingSong}${
+        limit ? `?limit=${limit}` : ""
+      }`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log("GET TRENDING SONGS ERROR:", error.response?.data);
+
+    if (error.response?.status === 401) {
+      throw new Error("Session expired. Please login again.");
+    }
+
+    throw new Error(
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed To Fetch Trending Songs"
+    );
+  }
+};
+
+export const searchSongs = async (
+  token:string,
+  query: string,
+  limit: number = 10
+) => {
+  try {
+    const response = await axios.get(
+      `${SERVER_URL}${API_ENDPOINTS.song.searchSongs}`,
+      {
+        params: {
+          q: query,
+          limit,
+        },
+         headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      
+      
+    );
+
+    console.log("The Resopnse for =====>",response)
+
+    return response.data;
+  } catch (error: any) {
+    console.error("SEARCH SONG ERROR:", error);
+
+    return {
+      success: false,
+      songs: [],
+      message:
+        error.response?.data?.message || "Something went wrong",
+    };
+  }
+};
 
 // ======================================================
 // UPDATE SONG
