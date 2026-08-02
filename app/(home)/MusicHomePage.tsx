@@ -132,11 +132,10 @@ function ToastViewport({ toast }: { toast: { message: string; type: "error" | "s
   return (
     <div className="fixed bottom-6 right-6 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200">
       <div
-        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium ${
-          toast.type === "error"
+        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium ${toast.type === "error"
             ? "bg-red-950/90 border-red-800/60 text-red-200"
             : "bg-emerald-950/90 border-emerald-800/60 text-emerald-200"
-        } backdrop-blur-md`}
+          } backdrop-blur-md`}
       >
         {toast.type === "error" ? (
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -502,52 +501,51 @@ function ArtistCard({
   };
 
   return (
-  <Link
-    href={`/artists/${artist._id}`}
-    className="group flex flex-col items-center gap-3 text-center"
-  >
-    <div className="relative w-full aspect-square">
-      {artist.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={artist.image}
-          alt={artist.name}
-          className="w-full h-full object-cover rounded-2xl border border-zinc-800/60 group-hover:border-zinc-700 transition-all duration-200"
-        />
-      ) : (
-        <div className="w-full h-full rounded-2xl bg-gradient-to-br from-violet-800 to-fuchsia-800 flex items-center justify-center border border-zinc-800/60 group-hover:border-zinc-700 transition-all duration-200">
-          <span className="text-white font-bold text-lg">{initials}</span>
-        </div>
-      )}
-
-      <button
-        onClick={handleToggleLike}
-        disabled={pending}
-        aria-label={liked ? "Unlike artist" : "Like artist"}
-        className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all duration-150 ${
-          liked
-            ? "bg-fuchsia-600/90 border-fuchsia-500 text-white"
-            : "bg-black/40 border-white/10 text-white/80 hover:text-white hover:bg-black/60"
-        } ${pending ? "opacity-60 cursor-not-allowed" : ""}`}
-      >
-        {pending ? (
-          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+    <Link
+      href={`/artists/${artist._id}`}
+      className="group flex flex-col items-center gap-3 text-center"
+    >
+      <div className="relative w-full aspect-square">
+        {artist.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={artist.image}
+            alt={artist.name}
+            className="w-full h-full object-cover rounded-2xl border border-zinc-800/60 group-hover:border-zinc-700 transition-all duration-200"
+          />
         ) : (
-          <HeartIcon filled={liked} className="w-3.5 h-3.5" />
+          <div className="w-full h-full rounded-2xl bg-gradient-to-br from-violet-800 to-fuchsia-800 flex items-center justify-center border border-zinc-800/60 group-hover:border-zinc-700 transition-all duration-200">
+            <span className="text-white font-bold text-lg">{initials}</span>
+          </div>
         )}
-      </button>
 
-      <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <PlayIcon className="w-3.5 h-3.5 text-white ml-0.5" />
+        <button
+          onClick={handleToggleLike}
+          disabled={pending}
+          aria-label={liked ? "Unlike artist" : "Like artist"}
+          className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all duration-150 ${liked
+              ? "bg-fuchsia-600/90 border-fuchsia-500 text-white"
+              : "bg-black/40 border-white/10 text-white/80 hover:text-white hover:bg-black/60"
+            } ${pending ? "opacity-60 cursor-not-allowed" : ""}`}
+        >
+          {pending ? (
+            <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <HeartIcon filled={liked} className="w-3.5 h-3.5" />
+          )}
+        </button>
+
+        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <PlayIcon className="w-3.5 h-3.5 text-white ml-0.5" />
+        </div>
       </div>
-    </div>
 
-    <div>
-      <p className="text-sm font-semibold text-zinc-200 truncate max-w-[120px]">{artist.name}</p>
-      <p className="text-xs text-zinc-500 mt-0.5">{formatCount(likeCount)} followers</p>
-    </div>
-  </Link>
-);
+      <div>
+        <p className="text-sm font-semibold text-zinc-200 truncate max-w-[120px]">{artist.name}</p>
+        <p className="text-xs text-zinc-500 mt-0.5">{formatCount(likeCount)} followers</p>
+      </div>
+    </Link>
+  );
 }
 
 // ─── Skeleton Card ────────────────────────────────────────────────────────────
@@ -579,11 +577,10 @@ function GenreChips({
         <button
           key={genre}
           onClick={() => onChange(genre)}
-          className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-600 transition-all duration-200 ${
-            active === genre
+          className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-600 transition-all duration-200 ${active === genre
               ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white"
               : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700"
-          }`}
+            }`}
         >
           {genre}
         </button>
@@ -693,11 +690,10 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
             {["Discover", "Artists", "Charts", "Radio", "Events"].map((item) => (
               <a
                 key={item}
-                className={`text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer ${
-                  item === "Discover"
+                className={`text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer ${item === "Discover"
                     ? "text-violet-400 bg-violet-500/10"
                     : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-                }`}
+                  }`}
               >
                 {item}
               </a>
@@ -779,18 +775,25 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
                   </DropdownMenuItem>
                   {((session.user as any)?.role === "admin" ||
                     (session.user as any)?.role === "artist") && (
-                    <DropdownMenuItem
-                      onClick={() => router.push("/dashboard")}
-                      className="px-3 py-2 text-sm rounded-lg text-zinc-300 focus:bg-zinc-900 focus:text-white cursor-pointer"
-                    >
-                      Dashboard
-                    </DropdownMenuItem>
-                  )}
+                      <DropdownMenuItem
+                        onClick={() => router.push("/dashboard")}
+                        className="px-3 py-2 text-sm rounded-lg text-zinc-300 focus:bg-zinc-900 focus:text-white cursor-pointer"
+                      >
+                        Dashboard
+                      </DropdownMenuItem>
+                    )}
 
                   <DropdownMenuSeparator className="bg-zinc-800/60 my-1" />
 
                   <DropdownMenuItem
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={async () => {
+                      await signOut({
+                        redirect: false,
+                      });
+
+                      router.replace("/login");
+                      router.refresh();
+                    }}
                     className="px-3 py-2 text-sm rounded-lg text-red-400 font-medium focus:bg-red-950/30 focus:text-red-300 cursor-pointer"
                   >
                     Sign Out
@@ -946,7 +949,7 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
         {/* ── Trending Now ── */}
         <section>
           <div className="flex items-center justify-between mb-6">
-            <TrendingSong/>
+            <TrendingSong />
           </div>
         </section>
 
