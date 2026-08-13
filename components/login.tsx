@@ -130,8 +130,6 @@
 // }
 
 // export default LoginForm;
-
-
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -149,13 +147,12 @@ import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { X } from "lucide-react";
 
 export default function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-
   const router = useRouter();
 
   const {
@@ -167,87 +164,93 @@ export default function LoginForm({
   });
 
   async function onSubmit(data: LoginSchemaType) {
-  try {
-    const response = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
+    try {
+      const response = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
 
-    if (response?.ok && !response?.error) {
-      toast.success("Login successful!");
+      if (response?.ok && !response?.error) {
+        toast.success("Login successful!");
 
-      // Fetch the freshly created session directly
-      const session = await getSession();
-      console.log("The Session =======>", session);
-      const role = (session?.user as any)?.role;
-      console.log("User Role =======>", role);
+        const session = await getSession();
+        const role = (session?.user as any)?.role;
 
-      if (role === "admin") {
-        router.push("/dashboard");
-      } else if (role === "artist") {
-        router.push("/dashboard-artist");
+        if (role === "admin") {
+          router.push("/dashboard");
+        } else if (role === "artist") {
+          router.push("/dashboard-artist");
+        } else {
+          router.push("/");
+        }
+
+        router.refresh();
       } else {
-        router.push("/");
+        toast.error(response?.error || "Invalid email or password");
       }
-
-      router.refresh();
-    } else {
-      toast.error(response?.error || "Invalid email or password");
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong. Please try again.");
     }
-  } catch (error) {
-    console.error(error);
-    toast.error("Something went wrong. Please try again.");
   }
-}
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className={cn("flex flex-col gap-6", className)}
+      className={cn(
+        "relative flex flex-col gap-6 p-8 rounded-2xl bg-[#0a0a0a] border border-white/10 shadow-2xl",
+        className
+      )}
       {...props}
     >
-      <FieldGroup>
-        <div className="flex items-center justify-between">
-          {/* Back Button */}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
+      {/* Close Button - Top Right */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => router.push("/")}
+        className="absolute top-4 right-4 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full"
+      >
+        <X className="h-5 w-5" />
+      </Button>
 
-          <div className="flex flex-col items-center gap-1 text-center flex-1">
-            <h1 className="text-2xl font-bold">Sign In</h1>
-          </div>
+      <FieldGroup>
+        {/* Header */}
+        <div className="flex flex-col items-center gap-1 text-center pt-2">
+          <h1 className="text-2xl font-bold text-white">Sign In</h1>
         </div>
 
         {/* EMAIL */}
         <Field>
-          <FieldLabel htmlFor="email">Email</FieldLabel>
+          <FieldLabel htmlFor="email" className="text-zinc-300">
+            Email
+          </FieldLabel>
           <Input
             id="email"
             type="email"
             placeholder="m@example.com"
+            className="bg-[#121212] border-white/10 text-white placeholder:text-zinc-500 focus-visible:ring-purple-500 focus-visible:border-purple-500"
             {...register("email")}
           />
           {errors.email && (
-            <p className="text-sm text-red-500">{errors.email.message}</p>
+            <p className="text-sm text-red-400">{errors.email.message}</p>
           )}
         </Field>
 
         {/* PASSWORD */}
         <Field>
-          <FieldLabel htmlFor="password">Password</FieldLabel>
+          <FieldLabel htmlFor="password" className="text-zinc-300">
+            Password
+          </FieldLabel>
           <Input
             id="password"
             type="password"
+            className="bg-[#121212] border-white/10 text-white placeholder:text-zinc-500 focus-visible:ring-purple-500 focus-visible:border-purple-500"
             {...register("password")}
           />
           {errors.password && (
-            <p className="text-sm text-red-500">{errors.password.message}</p>
+            <p className="text-sm text-red-400">{errors.password.message}</p>
           )}
         </Field>
 
@@ -256,16 +259,20 @@ export default function LoginForm({
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="bg-black text-white w-full"
+            className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-medium shadow-lg shadow-purple-500/20 border-0"
           >
             {isSubmitting ? "Signing in..." : "Login"}
           </Button>
         </Field>
 
+        {/* Sign up link */}
         <div className="flex justify-center text-sm">
-          <FieldLabel>
+          <FieldLabel className="text-zinc-400">
             Don't have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link
+              href="/register"
+              className="text-purple-400 hover:text-purple-300 hover:underline font-medium"
+            >
               Sign up
             </Link>
           </FieldLabel>

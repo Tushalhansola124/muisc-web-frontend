@@ -59,6 +59,13 @@ export const API_ENDPOINTS = {
     getById:"/api/playlist/",
     addSong:"/api/playlist/add-song/",
     removeSong:"/api/playlist/remove-song/"
+  },
+  history:{
+    add:"/api/history/add",
+    get:"/api/history",
+    clearHistory:"/api/history/clear",
+    deleteHistory:"/api/history/"
+
   }
 
 };

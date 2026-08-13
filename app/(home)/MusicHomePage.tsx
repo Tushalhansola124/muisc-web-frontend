@@ -686,20 +686,46 @@ export default function HomePage({ songs }: { songs: ISong[] }) {
           </div>
 
           {/* Nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {["Discover", "Artists", "Charts", "Radio", "Events"].map((item) => (
-              <a
-                key={item}
-                className={`text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer ${item === "Discover"
-                    ? "text-violet-400 bg-violet-500/10"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-                  }`}
-              >
-                {item}
-              </a>
-            ))}
-          </nav>
+       
 
+<nav className="hidden md:flex items-center gap-1">
+  <Link
+    href="/discover"
+    className="text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer text-violet-400 bg-violet-500/10"
+  >
+    Discover
+  </Link>
+  <Link
+    href="/artists"
+    className="text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-900"
+  >
+    Artists
+  </Link>
+  <Link
+    href="/charts"
+    className="text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-900"
+  >
+    Charts
+  </Link>
+  <Link
+    href="/radio"
+    className="text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-900"
+  >
+    Radio
+  </Link>
+  <Link
+    href="/events"
+    className="text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-900"
+  >
+    Events
+  </Link>
+  <Link
+    href="/history"
+    className="text-sm font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-900"
+  >
+    History
+  </Link>
+</nav>
           {/* Search + Auth */}
           <div className="flex items-center gap-3">
             {/* Desktop search with live dropdown */}
