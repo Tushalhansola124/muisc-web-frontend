@@ -1,8 +1,9 @@
 'use server';
 
-import axios from "axios";
+import { auth } from "@/auth";
 import { API_ENDPOINTS } from "@/core/constants/api_endpoint";
 import { SERVER_URL } from "@/index";
+import axios from "axios";
 
 // ======================================================
 // HISTORY INTERFACES
@@ -39,28 +40,54 @@ export interface IHistoryResponse {
 // ======================================================
 
 const axiosInstance = axios.create({
-  baseURL: SERVER_URL,
+  baseURL: SERVER_URL || process.env.SERVER_URL2,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
+
+// ======================================================
+// TOKEN HELPER (same as Artist)
+// ======================================================
+
+const getAuthHeaders = async () => {
+  const session = await auth();
+  const token = session?.user?.token;
+
+  if (!token) {
+    throw new Error("Unauthorized");
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+};
 
 // ======================================================
 // GET HISTORY
 // ======================================================
 
-export const GetHistory = async (
-  token: string
-): Promise<IHistoryResponse> => {
+export const GetHistory = async (): Promise<IHistoryResponse> => {
   try {
-    
-    const response = await axiosInstance.get(API_ENDPOINTS.history.get, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    console.log("GET HISTORY RESPONSE:", response.data);
+    const headers = await getAuthHeaders();
+    console.log("GET HISTORY Endpoint::", API_ENDPOINTS.history.get);
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.history.get,
+      { headers }
+    );
 
+    console.log("GET HISTORY RESPONSE:", response.data);
     return response.data;
   } catch (error: any) {
     console.log("GET HISTORY ERROR:", error);
+
+    if (error.response?.status === 401) {
+      throw new Error("Session expired. Please login again.");
+    }
+
+    if (error.response?.status === 404) {
+      throw new Error("History endpoint not found. Check API_ENDPOINTS.");
+    }
 
     throw new Error(
       error?.response?.data?.message ||
@@ -74,16 +101,14 @@ export const GetHistory = async (
 // ADD TO HISTORY
 // ======================================================
 
-export const AddToHistory = async (songId: string, token: string) => {
+export const AddToHistory = async (songId: string) => {
   try {
-    const response = await axios.post(
-      `${SERVER_URL}${API_ENDPOINTS.history.add}`,
+    const headers = await getAuthHeaders();
+
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.history.add,
       { songId },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      { headers }
     );
 
     return response.data;
@@ -102,15 +127,13 @@ export const AddToHistory = async (songId: string, token: string) => {
 // CLEAR HISTORY
 // ======================================================
 
-export const ClearHistory = async (token: string) => {
+export const ClearHistory = async () => {
   try {
-    const response = await axios.delete(
-      `${SERVER_URL}${API_ENDPOINTS.history.clearHistory}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+    const headers = await getAuthHeaders();
+
+    const response = await axiosInstance.delete(
+      API_ENDPOINTS.history.clearHistory,
+      { headers }
     );
 
     return response.data;
@@ -129,15 +152,13 @@ export const ClearHistory = async (token: string) => {
 // DELETE HISTORY ITEM
 // ======================================================
 
-export const DeleteHistory = async (historyId: string, token: string) => {
+export const DeleteHistory = async (historyId: string) => {
   try {
-    const response = await axios.delete(
-      `${SERVER_URL}${API_ENDPOINTS.history.deleteHistory}${historyId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+    const headers = await getAuthHeaders();
+
+    const response = await axiosInstance.delete(
+      `${API_ENDPOINTS.history.deleteHistory}${historyId}`,
+      { headers }
     );
 
     return response.data;

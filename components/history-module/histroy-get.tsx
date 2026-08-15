@@ -7,32 +7,27 @@ import { useSession } from "next-auth/react";
 import { formatDistanceToNow } from "date-fns";
 import { Clock, Trash2, Music2, X } from "lucide-react";
 import { toast } from "sonner";
-import { ClearHistory, DeleteHistory, GetHistory, HistoryItem } from "./contoller";
+import {
+  ClearHistory,
+  DeleteHistory,
+  GetHistory,
+  HistoryItem,
+} from "./contoller";
 
 export default function HistoryPage() {
   const { data: session, status } = useSession();
-
-  // Token extract - common cases cover kari didha
-  const token =
-    (session as any)?.accessToken ||
-    (session as any)?.token ||
-    (session as any)?.user?.token ||
-    "";
-
-  console.log("Session ::::====>", session);
-  console.log("Token ::::====>", token);
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
 
   const fetchHistory = async () => {
-    if (!token) return;
-
     try {
       setLoading(true);
-      const res = await GetHistory(token);
+      const res = await GetHistory();
+      console.log("The Get History Response:::====>",res.data);
       console.log("Fetched History:", res.data);
+
       if (res.success) {
         setHistory(res.data || []);
       }
@@ -44,21 +39,20 @@ export default function HistoryPage() {
   };
 
   useEffect(() => {
-    if (status === "authenticated" && token) {
+    if (status === "authenticated") {
       fetchHistory();
     }
     if (status === "unauthenticated") {
       setLoading(false);
     }
-  }, [status, token]);
+  }, [status]);
 
   const handleClearHistory = async () => {
-    if (!token) return;
     if (!confirm("Clear entire listening history?")) return;
 
     try {
       setClearing(true);
-      await ClearHistory(token);
+      await ClearHistory(); // ← no token
       setHistory([]);
       toast.success("History cleared");
     } catch (error: any) {
@@ -69,10 +63,8 @@ export default function HistoryPage() {
   };
 
   const handleDeleteItem = async (id: string) => {
-    if (!token) return;
-
     try {
-      await DeleteHistory(id, token);
+      await DeleteHistory(id); // ← no token
       setHistory((prev) => prev.filter((item) => item._id !== id));
       toast.success("Removed from history");
     } catch (error: any) {
@@ -100,7 +92,9 @@ export default function HistoryPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 text-center">
         <h2 className="text-xl font-semibold text-white">Please login</h2>
-        <p className="mt-2 text-zinc-400">Login to see your listening history</p>
+        <p className="mt-2 text-zinc-400">
+          Login to see your listening history
+        </p>
         <Link
           href="/login"
           className="mt-6 rounded-xl bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500"
