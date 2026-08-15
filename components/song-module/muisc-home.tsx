@@ -929,6 +929,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { AddToHistory } from "../history-module/contoller";
 
 interface Props {
   songs: ISong[];
@@ -1180,33 +1181,39 @@ export default function MusicHomePage({ songs }: Props) {
   }, [safeIndex, visibleSongs, activeSongId]); // eslint-disable-line
 
   // ── Register a play with the backend (used by playSong below) ─────
-  // This is what makes the play count go up — for BOTH the main list and
-  // the Trending row, since both call playSong() -> registerPlay().
-  const registerPlay = async (song: ISong) => {
-    playedSongsRef.current.add(song._id);
-    try {
-      const res = await PlaySong(song._id, session?.user?.token || "");
-      if (res?.success) {
 
-        const updatedPlays =
-          res?.data?.plays ?? res?.totalPlays ?? ((playCounts[song._id] ?? song.plays ?? 0) + 1);
-        setPlayCounts((prev) => ({ ...prev, [song._id]: updatedPlays }));
-        setRecentlyPlayedId(song._id);
-        setTimeout(() => {
-          setRecentlyPlayedId((cur) => (cur === song._id ? null : cur));
-        }, 1200);
-        toast.success(`Play count updated for: ${song.title}`);
-      } else {
-        toast.error(res?.message || `Play count update failed for: ${song.title}`);
-        // registration failed server-side → allow a retry on next play
-        playedSongsRef.current.delete(song._id);
-      }
-    } catch (err) {
-      console.error("Play API failed:", err);
-      // Don't block playback if the API call fails, but allow a retry
+const registerPlay = async (song: ISong) => {
+  playedSongsRef.current.add(song._id);
+
+  // 1. Update Play Count
+  try {
+    const res = await PlaySong(song._id, session?.user?.token || "");
+    if (res?.success) {
+      const updatedPlays =
+        res?.data?.plays ??
+        res?.totalPlays ??
+        (playCounts[song._id] ?? song.plays ?? 0) + 1;
+
+      setPlayCounts((prev) => ({ ...prev, [song._id]: updatedPlays }));
+      setRecentlyPlayedId(song._id);
+      setTimeout(() => {
+        setRecentlyPlayedId((cur) => (cur === song._id ? null : cur));
+      }, 1200);
+    } else {
       playedSongsRef.current.delete(song._id);
     }
-  };
+  } catch (err) {
+    console.error("Play API failed:", err);
+    playedSongsRef.current.delete(song._id);
+  }
+
+  // 2. Add to Listening History
+  try {
+     await AddToHistory(song._id);
+  } catch (err) {
+    console.error("AddToHistory failed:", err);
+  }
+};
 
   // ── Playback handler (single source of truth for play counting) ───
   const playSong = async (song: ISong) => {
