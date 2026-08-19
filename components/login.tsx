@@ -130,6 +130,7 @@
 // }
 
 // export default LoginForm;
+
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -199,7 +200,7 @@ export default function LoginForm({
     <form
       onSubmit={handleSubmit(onSubmit)}
       className={cn(
-        "relative flex flex-col gap-6 p-8 rounded-2xl bg-[#0a0a0a] border border-white/10 shadow-2xl",
+        "relative flex flex-col gap-6 p-8 rounded-2xl bg-[#16161a] border border-white/10 shadow-2xl",
         className
       )}
       {...props}
@@ -230,7 +231,7 @@ export default function LoginForm({
             id="email"
             type="email"
             placeholder="m@example.com"
-            className="bg-[#121212] border-white/10 text-white placeholder:text-zinc-500 focus-visible:ring-purple-500 focus-visible:border-purple-500"
+            className="bg-[#1e1e24] border-white/10 text-white placeholder:text-zinc-500 focus-visible:ring-purple-500 focus-visible:border-purple-500"
             {...register("email")}
           />
           {errors.email && (
@@ -246,7 +247,7 @@ export default function LoginForm({
           <Input
             id="password"
             type="password"
-            className="bg-[#121212] border-white/10 text-white placeholder:text-zinc-500 focus-visible:ring-purple-500 focus-visible:border-purple-500"
+            className="bg-[#1e1e24] border-white/10 text-white placeholder:text-zinc-500 focus-visible:ring-purple-500 focus-visible:border-purple-500"
             {...register("password")}
           />
           {errors.password && (
