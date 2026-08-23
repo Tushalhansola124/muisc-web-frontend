@@ -9,6 +9,7 @@ import axios from "axios";
 // DASHBOARD INTERFACES
 // ======================================================
 
+// -------------------- ADMIN --------------------
 export interface IAdminDashboardTotals {
   users: number;
   artists: number;
@@ -84,14 +85,34 @@ export interface IAdminDashboardResponse {
   data: IAdminDashboardData;
 }
 
-// Artist dashboard counts
+// -------------------- ARTIST --------------------
+export interface IArtistSong {
+  _id: string;
+  title: string;
+  duration: number;
+  thumbnail: string;
+  plays: number;
+  likes: number;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+export interface IArtistAlbum {
+  _id: string;
+  title: string;
+  coverImage: string;
+  songs: any[];
+  createdAt: string;
+}
+
 export interface IArtistDashboardData {
-  users: number;
-  artists: number;
+  artistName: string;
+  artistImage: string | null;
   songs: number;
   albums: number;
-  genres: number;
-  playlists: number;
+  playlists?: number;
+  songsList: IArtistSong[];
+  albumsList: IArtistAlbum[];
 }
 
 export interface IArtistDashboardResponse {
@@ -160,7 +181,7 @@ export const GetAdminDashboardStats = async (): Promise<IAdminDashboardResponse>
 };
 
 // ======================================================
-// GET ARTIST DASHBOARD COUNTS
+// GET ARTIST DASHBOARD COUNTS + LISTS
 // ======================================================
 
 export const GetArtistDashboardCounts = async (): Promise<IArtistDashboardResponse> => {
