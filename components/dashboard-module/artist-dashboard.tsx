@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { GetArtistDashboardCounts, IArtistDashboardResponse } from "@/actions/dashboard"; // path adjust karo
+import { useEffect, useState } from "react"; 
 import {
   Music,
   Disc3,
@@ -15,6 +14,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { GetArtistDashboardCounts, IArtistDashboardResponse } from "./contoller";
 
 // ======================================================
 // HELPER COMPONENTS
