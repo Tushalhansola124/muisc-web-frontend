@@ -64,8 +64,11 @@ export const API_ENDPOINTS = {
     add:"/api/history/add",
     get:"/api/history",
     clearHistory:"/api/history/clear",
-    deleteHistory:"/api/history/"
-
+    deleteHistory:"/api/history/",
+  },
+  dashboard:{
+    admin:"/api/dashboard/stats",
+    artist:"/api/dashboard/counts"
   }
 
 };

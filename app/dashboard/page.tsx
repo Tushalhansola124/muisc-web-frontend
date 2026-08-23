@@ -1,9 +1,10 @@
+import AdminDashboard from "@/components/dashboard-module/admin-dashboard";
 
 
 export default function Dashboard() {
   return (
    <>
-    <h1>Dashboard</h1>
+ <AdminDashboard/>
    </>
   )
 }
