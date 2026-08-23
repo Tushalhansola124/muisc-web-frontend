@@ -36,12 +36,12 @@ export function NavUserArtist({
   const { isMobile } = useSidebar()
   const router = useRouter();
   const {data:session} = useSession()
-  const handleLogout = () => {
-    signOut({ 
-      callbackUrl: "/login",
-      redirect: true 
-    })
-  }
+  // const handleLogout = () => {
+  //   signOut({ 
+  //     callbackUrl: "/login",
+  //     redirect: true 
+  //   })
+  // }
 
   return (
     <SidebarMenu>
@@ -106,7 +106,14 @@ export function NavUserArtist({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
            <DropdownMenuItem 
-              onClick={handleLogout}
+               onClick={async () => {
+                      await signOut({
+                        redirect: false,
+                      });
+
+                      router.replace("/login");
+                      router.refresh();
+                    }}
               className="text-red-600 focus:text-red-600 cursor-pointer"
             >
               <LogOutIcon className="mr-2 h-4 w-4" />
