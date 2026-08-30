@@ -1,53 +1,42 @@
-'use server';
+"use server";
 
 import { auth } from "@/auth";
 import { API_ENDPOINTS } from "@/core/constants/api_endpoint";
 import { SERVER_URL } from "@/index";
-
 import axios from "axios";
 
-import { cookies } from "next/headers";
-
 // ======================================================
-// USER INTERFACES
+// INTERFACES
 // ======================================================
 
 export interface IArtist {
-  songs: never[];
-  artist: any;
-  userId: string
-  _id: string
-  name: string
-  bio: string
-  image: string
-  imageFileId: string
-  followers: number
-  createdAt: string
-  updatedAt: string
-  __v: number
-}
-
-export interface IUserResponse {
-  success: boolean;
-  count: number;
-  data: IArtist[];
+  _id: string;
+  name: string;
+  bio: string;
+  image: string;
+  imageFileId?: string;
+  followers: number;
+  userId?: string | { _id: string };
+  user?: { _id: string };
+  createdAt: string;
+  updatedAt: string;
+  __v?: number;
 }
 
 export interface ISingleArtistResponse {
   success: boolean;
-  data: IArtist;
+  message?: string;
+  data: {
+    artist: IArtist;
+    totalSongs: number;
+    songs: any[];
+  };
 }
 
-export interface RegisterPayload {
-  name: string
-  bio: string
-  image: string
-}
-
-export interface UpdateArtistPayload {
-  name: string
-  bio: string
-  image: string
+export interface IArtistsResponse {
+  success: boolean;
+  count?: number;
+  data: IArtist[];
 }
 
 // ======================================================
@@ -56,9 +45,6 @@ export interface UpdateArtistPayload {
 
 const axiosInstance = axios.create({
   baseURL: SERVER_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // ======================================================
@@ -66,14 +52,8 @@ const axiosInstance = axios.create({
 // ======================================================
 
 const getAuthHeaders = async () => {
-
   const session = await auth();
-
-//   console.log("SESSION :", session);
-
   const token = session?.user?.token;
-
-//   console.log("TOKEN :", token);
 
   if (!token) {
     throw new Error("Unauthorized");
@@ -85,100 +65,73 @@ const getAuthHeaders = async () => {
 };
 
 // ======================================================
-// GET ALL USERS
+// GET ALL ARTISTS
 // ======================================================
 
 export const GetArtists = async () => {
   try {
-
-    // const headers =
-    //   await getAuthHeaders();
-
     const response = await axios.get(
-      `${SERVER_URL}${API_ENDPOINTS.artist.get}`,
-  
+      `${SERVER_URL}${API_ENDPOINTS.artist.get}`
     );
-
     return response.data;
-
   } catch (error: any) {
-
-   
-
     throw new Error(
       error?.response?.data?.message ||
-      error?.message ||
-      "Failed To Fetch Artists"
+        error?.message ||
+        "Failed To Fetch Artists"
     );
   }
 };
-
 
 // ======================================================
 // CREATE ARTIST
 // ======================================================
 
-export const CreateArtist = async (
-  data: FormData
-) => {
+export const CreateArtist = async (data: FormData) => {
   try {
+    const headers = await getAuthHeaders();
 
-    const headers =
-      await getAuthHeaders();
-
-    const response =
-      await axiosInstance.post(
-        API_ENDPOINTS.artist.add,
-        data,
-        {
-          headers: {
-            ...headers,
-            "Content-Type":
-              "multipart/form-data",
-          },
-        }
-      );
-
-    return response.data;
-
-  } catch (error: any) {
-
-    console.log(
-      "CREATE ARTIST ERROR :",
-      error
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.artist.add,
+      data,
+      {
+        headers: {
+          ...headers,
+          // Do NOT force Content-Type for FormData
+        },
+      }
     );
 
+    return response.data;
+  } catch (error: any) {
+    console.log("CREATE ARTIST ERROR :", error);
     throw new Error(
       error?.response?.data?.message ||
-      error?.message ||
-      "Create User Failed"
+        error?.message ||
+        "Create Artist Failed"
     );
   }
 };
 
 // ======================================================
-// GET ARTIST BY ID
+// GET ARTIST BY ID  (FIXED)
 // ======================================================
 
 export const GetArtistById = async (
   id: string
 ): Promise<ISingleArtistResponse> => {
   try {
-    // const headers = await getAuthHeaders();
-
-
+    const headers = await getAuthHeaders();
 
     const response = await axiosInstance.get(
       `${API_ENDPOINTS.artist.getById}${id}`,
-     
+      { headers }
     );
 
     console.log("✅ Artist Data Received:", response.data);
-
     return response.data;
-
   } catch (error: any) {
-    console.error("❌ GetArtistById Error Details:", {
+    console.error("❌ GetArtistById Error:", {
       status: error.response?.status,
       message: error.response?.data?.message,
       fullError: error.response?.data,
@@ -194,22 +147,17 @@ export const GetArtistById = async (
 
     throw new Error(
       error?.response?.data?.message ||
-      error?.message ||
-      "Failed To Fetch Artist"
+        error?.message ||
+        "Failed To Fetch Artist"
     );
   }
 };
-
-
 
 // ======================================================
 // UPDATE ARTIST
 // ======================================================
 
-export const UpdateArtist = async (
-  id: string,
-  data: FormData
-) => {
+export const UpdateArtist = async (id: string, data: FormData) => {
   try {
     const headers = await getAuthHeaders();
 
@@ -219,78 +167,59 @@ export const UpdateArtist = async (
       {
         headers: {
           ...headers,
-          "Content-Type": "multipart/form-data",
         },
       }
     );
 
     return response.data;
   } catch (error: any) {
-    console.log("UPDATE USER ERROR :", error);
+    console.log("UPDATE ARTIST ERROR :", error);
     throw new Error(
-      error?.response?.data?.message || "Update User Failed"
+      error?.response?.data?.message || "Update Artist Failed"
     );
   }
 };
 
 // ======================================================
-// DELETE USER
+// DELETE ARTIST
 // ======================================================
 
-export const DeleteArtist = async (
-  id: string
-) => {
+export const DeleteArtist = async (id: string) => {
   try {
-
     const headers = await getAuthHeaders();
 
     const response = await axiosInstance.delete(
       `${API_ENDPOINTS.artist.delete}${id}`,
-      {
-        headers,
-      }
+      { headers }
     );
 
     return response.data;
-
   } catch (error: any) {
-
     throw new Error(
-      error?.response?.data?.message ||
-      "Delete Artist Failed"
+      error?.response?.data?.message || "Delete Artist Failed"
     );
   }
 };
 
-
-
+// ======================================================
+// GET OWN ARTIST
+// ======================================================
 
 export const GetOwnArtist = async () => {
   try {
-
-    const headers =
-      await getAuthHeaders();
+    const headers = await getAuthHeaders();
 
     const response = await axios.get(
       `${SERVER_URL}${API_ENDPOINTS.artist.getOwnArtist}`,
-        {
-        headers,
-      },
-  
+      { headers }
     );
 
     return response.data;
-
   } catch (error: any) {
-
-   
-
     throw new Error(
       error?.response?.data?.message ||
-      error?.message ||
-      "Failed To Fetch Artists"
+        error?.message ||
+        "Failed To Fetch Own Artist"
     );
   }
 };
-
-

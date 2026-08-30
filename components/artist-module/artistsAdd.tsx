@@ -35,7 +35,10 @@ type UserOption = {
   email: string;
 };
 
-export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps) {
+export default function ArtistForm({
+  artistId,
+  isEdit = false,
+}: ArtistFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
@@ -47,31 +50,38 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    reset,
   } = useForm({
     defaultValues: {
       name: "",
       bio: "",
-      userId: "",           // New field for selected user
+      userId: "",
     },
   });
 
-  // Fetch Users for Dropdown
+  // =============================================
+  // 1. Load Users for Dropdown
+  // =============================================
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const res = await GetUsers();
-        if (res.success && res.data) {
+        if (res?.success && Array.isArray(res.data)) {
+          setUsers(res.data);
+        } else if (Array.isArray(res?.data)) {
           setUsers(res.data);
         }
       } catch (error) {
         console.error("Failed to load users", error);
+        toast.error("Failed to load users");
       }
     };
     fetchUsers();
   }, []);
 
-  // Fetch Artist Data for Edit
+  // =============================================
+  // 2. Prefill Artist Data (FIXED for your API)
+  // =============================================
   useEffect(() => {
     if (!isEdit || !artistId) {
       setInitialLoading(false);
@@ -82,32 +92,65 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
       setInitialLoading(true);
       try {
         const res = await GetArtistById(artistId);
-        if (res.success && res.data) {
-          const artist = res.data;
-          setValue("name", artist.name || "");
-          setValue("bio", artist.bio || "");
-          setValue("userId", artist.userId || ""); // if you have userId in artist
-          if (artist.image) setPreview(artist.image);
+
+        // Your API shape: { success, data: { artist, totalSongs, songs } }
+        const artist = res?.data?.artist;
+
+        if (!artist) {
+          toast.error("Artist not found");
+          return;
+        }
+
+        // Handle userId (string or populated object)
+        const userIdValue =
+          typeof artist.userId === "string"
+            ? artist.userId
+            : artist.userId?._id ||
+              artist.user?._id ||
+              "";
+
+        // Prefill form
+        reset({
+          name: artist.name || "",
+          bio: artist.bio || "",
+          userId: userIdValue,
+        });
+
+        // Force Select update
+        setValue("userId", userIdValue);
+
+        // Image preview
+        if (artist.image) {
+          setPreview(artist.image);
         }
       } catch (error: any) {
-        toast.error("Failed to load artist data");
+        console.error(error);
+        toast.error(error.message || "Failed to load artist data");
       } finally {
         setInitialLoading(false);
       }
     };
 
     fetchArtist();
-  }, [isEdit, artistId, setValue]);
+  }, [isEdit, artistId, reset, setValue]);
 
+  // =============================================
+  // Submit
+  // =============================================
   const onSubmit = async (data: any) => {
     setLoading(true);
+
     const formData = new FormData();
-
     formData.append("name", data.name);
-    formData.append("bio", data.bio);
-    if (data.userId) formData.append("userId", data.userId);
+    formData.append("bio", data.bio || "");
+    if (data.userId) {
+      formData.append("userId", data.userId);
+    }
 
-    const fileInput = (document.getElementById("image") as HTMLInputElement)?.files;
+    const fileInput = (
+      document.getElementById("image") as HTMLInputElement
+    )?.files;
+
     if (fileInput?.[0]) {
       formData.append("image", fileInput[0]);
     }
@@ -129,7 +172,11 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
   };
 
   if (initialLoading) {
-    return <div className="flex justify-center items-center min-h-[400px]">Loading artist data...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        Loading artist data...
+      </div>
+    );
   }
 
   return (
@@ -137,7 +184,11 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
       <Card className="shadow-xl">
         <CardHeader className="border-b">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
               <MoveLeftIcon className="h-5 w-5" /> Back
             </Button>
             <CardTitle className="text-3xl font-bold">
@@ -145,7 +196,9 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
             </CardTitle>
           </div>
           <p className="text-muted-foreground mt-2">
-            {isEdit ? "Update artist details and profile" : "Add a new artist to your music platform"}
+            {isEdit
+              ? "Update artist details and profile"
+              : "Add a new artist to your music platform"}
           </p>
         </CardHeader>
 
@@ -154,7 +207,10 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
             {/* Artist Name */}
             <div className="space-y-2">
               <Label>Artist Name</Label>
-              <Input placeholder="Arijit Singh" {...register("name")} />
+              <Input
+                placeholder="Arijit Singh"
+                {...register("name")}
+              />
             </div>
 
             {/* Bio */}
@@ -177,21 +233,26 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
               >
                 <SelectTrigger className="w-full h-12">
                   <SelectValue placeholder="Select User">
-                    {users.find((u) => u._id === watch("userId"))
-                      ? `${users.find((u) => u._id === watch("userId"))?.firstName} ${users.find((u) => u._id === watch("userId"))?.lastName}`
-                      : ""}
+                    {(() => {
+                      const selected = users.find(
+                        (u) => u._id === watch("userId")
+                      );
+                      return selected
+                        ? `${selected.firstName} ${selected.lastName}`
+                        : "Select User";
+                    })()}
                   </SelectValue>
                 </SelectTrigger>
 
                 <SelectContent>
                   {users.map((user) => (
-                    <SelectItem
-                      key={user._id}
-                      value={user._id}
-                    >
+                    <SelectItem key={user._id} value={user._id}>
                       <div className="flex flex-col py-1">
                         <span className="font-medium">
                           {user.firstName} {user.lastName}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          @{user.username}
                         </span>
                       </div>
                     </SelectItem>
@@ -199,24 +260,40 @@ export default function ArtistForm({ artistId, isEdit = false }: ArtistFormProps
                 </SelectContent>
               </Select>
             </div>
+
             {/* Profile Image */}
             <div className="space-y-2">
               <Label>Profile Image</Label>
               <Input id="image" type="file" accept="image/*" />
               {preview && (
                 <div className="mt-4">
-                  <img src={preview} alt="Preview" className="w-40 h-40 object-cover rounded-xl border shadow" />
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="w-40 h-40 object-cover rounded-xl border shadow"
+                  />
                 </div>
               )}
             </div>
 
             {/* Buttons */}
             <div className="flex gap-4 pt-6">
-              <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                className="flex-1"
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? (isEdit ? "Updating Artist..." : "Creating Artist...") : (isEdit ? "Update Artist" : "Create Artist")}
+                {loading
+                  ? isEdit
+                    ? "Updating Artist..."
+                    : "Creating Artist..."
+                  : isEdit
+                  ? "Update Artist"
+                  : "Create Artist"}
               </Button>
             </div>
           </form>

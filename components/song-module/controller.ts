@@ -178,9 +178,12 @@ export const PlaySong = async (songId: string, token?: string) => {
 // GET SONG BY ID
 // ======================================================
 
+// ======================================================
+// GET SONG BY ID
+// ======================================================
 export const GetSongById = async (
-  token: string,
-  id: string,
+  id: string,          // ← ID first
+  token: string,       // ← token second
 ): Promise<ISingleSongResponse> => {
   try {
     const response = await axiosInstance.get(
@@ -206,12 +209,11 @@ export const GetSongById = async (
 
     throw new Error(
       error?.response?.data?.message ||
-      error?.message ||
-      "Failed To Fetch Song"
+        error?.message ||
+        "Failed To Fetch Song"
     );
   }
-}
-
+};
 
 // ======================================================
 // GET TRENDING SONGS
